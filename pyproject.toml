@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "liquid-dash"
+version = "0.1.3"
+description = "Small helpers for building more dynamic, app-like interfaces in Dash."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "liquid-dash contributors" }
+]
+dependencies = [
+  "dash>=2.16",
+]
+keywords = ["dash", "plotly", "ui", "delegation", "dynamic-layout"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+liquid_dash = ["assets/*.js"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
