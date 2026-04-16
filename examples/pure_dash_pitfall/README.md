@@ -6,7 +6,7 @@ the browser dev tools, not just read about it.
 
 ```bash
 python examples/pure_dash_pitfall/pure_dash.py     # buggy by design
-python examples/pure_dash_pitfall/liquid_dash.py   # same UX, no pitfalls
+python examples/pure_dash_pitfall/with_liquid_dash.py   # same UX, no pitfalls
 ```
 
 Open the browser dev tools, filter Network by `_dash-update-component`,
@@ -97,7 +97,7 @@ Counted at load time:
 | | callbacks registered |
 |---|---|
 | `pure_dash.py` | **5** (one per action type, plus the renderer) |
-| `liquid_dash.py` | **2** (bridge dispatch + renderer) |
+| `with_liquid_dash.py` | **2** (bridge dispatch + renderer) |
 
 The pure-Dash count grows with the number of action types; liquid-dash
 stays at 2 no matter how many actions you add.

@@ -6,7 +6,10 @@ Same behavior as pure_dash.py, but:
   - actions are sent on the DOM event itself, not derived from n_clicks
 
 Run:
-    python examples/pure_dash_pitfall/liquid_dash.py
+    python examples/pure_dash_pitfall/with_liquid_dash.py
+
+(File is named with_liquid_dash.py rather than liquid_dash.py so that
+`import liquid_dash` inside it doesn't shadow the installed package.)
 """
 from __future__ import annotations
 
