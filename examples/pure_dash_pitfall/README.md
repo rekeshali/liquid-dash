@@ -5,13 +5,19 @@ growable list. Use them to *see* the difference in callback activity in
 the browser dev tools, not just read about it.
 
 ```bash
-python examples/pure_dash_pitfall/pure_dash.py     # buggy by design
+python examples/pure_dash_pitfall/pure_dash.py          # buggy by design
 python examples/pure_dash_pitfall/with_liquid_dash.py   # same UX, no pitfalls
+python examples/pure_dash_pitfall/side_by_side.py       # both, in one page
 ```
 
 Open the browser dev tools, filter Network by `_dash-update-component`,
 and click around. The two apps look identical; their callback panels
 do not.
+
+`side_by_side.py` mounts both implementations next to each other and
+embeds an in-page console under each that logs every
+`_dash-update-component` fire attributed to its side — the same
+information you'd squint at in dev tools, visible at a glance.
 
 ## Three pitfalls in `pure_dash.py`
 
