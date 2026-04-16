@@ -259,26 +259,10 @@ _console_style = {
 }
 
 
-def _column(title, badge, badge_color, controls, list_id, console_id):
+def _column(title, controls, list_id, console_id):
     return html.Div(
         [
-            html.Div(
-                [
-                    html.H2(title, style={"margin": 0}),
-                    html.Span(
-                        badge,
-                        style={
-                            "background": badge_color,
-                            "color": "white",
-                            "padding": "2px 8px",
-                            "borderRadius": "10px",
-                            "fontSize": "11px",
-                            "fontWeight": "600",
-                        },
-                    ),
-                ],
-                style={"display": "flex", "alignItems": "center", "gap": "10px", "marginBottom": "12px"},
-            ),
+            html.H2(title, style={"margin": "0 0 12px 0"}),
             html.Div(controls, style={"display": "flex", "gap": "8px", "marginBottom": "8px"}),
             html.Div(id=list_id, style={"minHeight": "120px"}),
             html.Hr(),
@@ -314,8 +298,6 @@ app.layout = html.Div(
             [
                 _column(
                     "Pure Dash",
-                    "buggy by design",
-                    "#c43838",
                     [
                         html.Button("Toggle filter (all <-> open)", id="pd-filter"),
                         html.Button("Add item", id="pd-add"),
@@ -325,8 +307,6 @@ app.layout = html.Div(
                 ),
                 _column(
                     "liquid-dash",
-                    "no pitfalls",
-                    "#1f8a4c",
                     [
                         ld.on(html.Button("Toggle filter (all <-> open)"), "filter", to="ld-bridge"),
                         ld.on(html.Button("Add item"), "add", to="ld-bridge"),
