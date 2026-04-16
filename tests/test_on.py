@@ -65,3 +65,28 @@ def test_on_rejects_non_json_payload():
         pass
     else:
         raise AssertionError("Expected ValueError for non-JSON payload")
+
+
+def test_on_stringifies_integer_target():
+    # Client JS reads dataset attributes as strings; stringify at the boundary
+    # so handlers comparing `event["target"]` to `item["id"]` don't silently
+    # fail on int-vs-str mismatch.
+    wrapped = ld.on(html.Button("x"), "delete", target=42)
+    assert _props(wrapped)["data-ld-target"] == "42"
+
+
+def test_on_stringifies_zero_target():
+    # target=0 used to fall through `target or ""` and become "" — a silent
+    # data-loss bug. Now it becomes "0".
+    wrapped = ld.on(html.Button("x"), "delete", target=0)
+    assert _props(wrapped)["data-ld-target"] == "0"
+
+
+def test_on_treats_none_target_as_empty():
+    wrapped = ld.on(html.Button("x"), "delete", target=None)
+    assert _props(wrapped)["data-ld-target"] == ""
+
+
+def test_on_stringifies_source():
+    wrapped = ld.on(html.Button("x"), "delete", source=7)
+    assert _props(wrapped)["data-ld-source"] == "7"

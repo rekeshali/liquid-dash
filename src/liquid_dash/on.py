@@ -18,8 +18,8 @@ def _wrap(
     payload: Any = None,
     event: str = "click",
     to: str = DEFAULT_BRIDGE_ID,
-    target: str | None = None,
-    source: str | None = None,
+    target: Any = None,
+    source: Any = None,
     prevent_default: bool = False,
 ):
     if not isinstance(action, str) or not action.strip():
@@ -37,8 +37,8 @@ def _wrap(
         "data-ld-event": event,
         "data-ld-payload": payload_json,
         "data-ld-bridge": to or "",
-        "data-ld-target": target or "",
-        "data-ld-source": source or "",
+        "data-ld-target": "" if target is None else str(target),
+        "data-ld-source": "" if source is None else str(source),
         "data-ld-prevent-default": "true" if prevent_default else "false",
     }
 
@@ -50,8 +50,8 @@ def on(
     payload: Any = None,
     event: str = "click",
     to: str = DEFAULT_BRIDGE_ID,
-    target: str | None = None,
-    source: str | None = None,
+    target: Any = None,
+    source: Any = None,
     prevent_default: bool = False,
 ) -> Any:
     """Attach a liquid-dash event to a Dash component.
