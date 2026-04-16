@@ -1,40 +1,37 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass, field
 from typing import Any
 
 from .exceptions import UnsafeLayoutError
-from .types import ValidationIssue, ValidationReport
 
 
-_INTERACTIVE_NAMES = {
-    "Button",
-    "A",
-    "Input",
-    "Textarea",
-    "Select",
-    "Checklist",
-    "RadioItems",
-    "Dropdown",
-    "Slider",
-    "RangeSlider",
-    "Tab",
-}
+@dataclass
+class ValidationIssue:
+    level: str
+    code: str
+    message: str
+    component_id: str | None = None
+
+
+@dataclass
+class ValidationReport:
+    issues: list[ValidationIssue] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not self.issues
 
 
 def _component_name(component: Any) -> str:
-    return getattr(component, "__class__", type(component)).__name__
+    return type(component).__name__
 
 
 def _props(component: Any) -> dict[str, Any]:
     if hasattr(component, "to_plotly_json"):
         return component.to_plotly_json().get("props", {})
     return {}
-
-
-def _children_of(component: Any):
-    props = _props(component)
-    return props.get("children")
 
 
 def _iter_children(children: Any):
@@ -49,114 +46,108 @@ def _iter_children(children: Any):
     yield children
 
 
-def validate_layout(
-    layout,
-    *,
-    strict: bool = False,
-    require_bridge_for_actions: bool = True,
-    warn_on_interactive_in_dynamic: bool = True,
-    return_report: bool = False,
-):
-    """Validate a Dash layout tree for a few common liquid_dash pitfalls."""
+def validate(layout, *, strict: bool = False) -> ValidationReport:
+    """Walk a Dash layout for common liquid-dash mistakes.
+
+    Reports:
+      - duplicate-id: two components share an id
+      - empty-action: an element has data-ld-action set to empty string
+      - missing-bridge: an element targets a bridge id that is not present
+        as a dcc.Store in the layout
+      - empty-event: an element has data-ld-event set to empty string
+
+    If `strict=True`, raises UnsafeLayoutError when any issue is found.
+    """
     report = ValidationReport()
     seen_ids: set[str] = set()
+    store_ids: set[str] = set()
+    scopes: set[str] = set()
+    action_targets: list[tuple[str, str | None]] = []  # (bridge_or_scope, component_id)
 
-    def walk(
-        component: Any,
-        *,
-        in_dynamic: bool,
-        inherited_bridge: str | None,
-        region_name: str | None,
-    ) -> None:
+    def walk(component: Any):
         if component is None or isinstance(component, (str, int, float, bool)):
             return
 
         props = _props(component)
-        component_id = props.get("id")
-        name = _component_name(component)
+        cid = props.get("id")
 
-        if isinstance(component_id, str):
-            if component_id in seen_ids:
+        if isinstance(cid, str):
+            if cid in seen_ids:
                 report.issues.append(
                     ValidationIssue(
                         level="warning",
                         code="duplicate-id",
-                        message=f"Duplicate component id found: {component_id}",
-                        component_id=component_id,
-                        region_name=region_name,
+                        message=f"Duplicate component id: {cid}",
+                        component_id=cid,
                     )
                 )
-            seen_ids.add(component_id)
+            seen_ids.add(cid)
 
-        region_kind = props.get("data-ld-region")
-        current_region_name = props.get("data-ld-region-name") or region_name
-        current_bridge = props.get("data-ld-default-bridge") or inherited_bridge
+        if _component_name(component) == "Store" and isinstance(cid, str):
+            store_ids.add(cid)
 
-        if region_kind == "dynamic":
-            in_dynamic = True
-        elif region_kind == "stable" and in_dynamic:
-            report.issues.append(
-                ValidationIssue(
-                    level="warning",
-                    code="stable-inside-dynamic",
-                    message="StableRegion appears inside a dynamic region.",
-                    component_id=component_id,
-                    region_name=current_region_name,
-                )
-            )
+        scope = props.get("data-ld-default-bridge")
+        if scope:
+            scopes.add(scope)
 
-        action_name = props.get("data-ld-action")
-        own_bridge = props.get("data-ld-bridge") or current_bridge
-        if action_name is not None:
-            if require_bridge_for_actions and not own_bridge:
-                report.issues.append(
-                    ValidationIssue(
-                        level="warning",
-                        code="missing-bridge",
-                        message="Delegated action element does not have a bridge.",
-                        component_id=component_id,
-                        region_name=current_region_name,
-                    )
-                )
-            if not str(action_name).strip():
+        action = props.get("data-ld-action")
+        if action is not None:
+            if not str(action).strip():
                 report.issues.append(
                     ValidationIssue(
                         level="warning",
                         code="empty-action",
-                        message="Delegated action element has an empty action.",
-                        component_id=component_id,
-                        region_name=current_region_name,
+                        message="Element has empty data-ld-action.",
+                        component_id=cid,
                     )
                 )
+            own_bridge = props.get("data-ld-bridge") or ""
+            action_targets.append((own_bridge, cid))
 
-        if in_dynamic and warn_on_interactive_in_dynamic:
-            if name in _INTERACTIVE_NAMES and action_name is None:
+            ev = props.get("data-ld-event")
+            if ev is not None and not str(ev).strip():
                 report.issues.append(
                     ValidationIssue(
                         level="warning",
-                        code="raw-interactive-in-dynamic",
-                        message=(
-                            "Interactive component found inside DynamicRegion without delegated action metadata."
-                        ),
-                        component_id=component_id,
-                        region_name=current_region_name,
+                        code="empty-event",
+                        message="Element has empty data-ld-event.",
+                        component_id=cid,
                     )
                 )
 
-        for child in _iter_children(_children_of(component)):
-            walk(
-                child,
-                in_dynamic=in_dynamic,
-                inherited_bridge=current_bridge,
-                region_name=current_region_name,
+        for child in _iter_children(props.get("children")):
+            walk(child)
+
+    walk(layout)
+
+    # Check bridges referenced by actions exist as Stores
+    reachable_bridges = store_ids | scopes
+    for own_bridge, cid in action_targets:
+        target = own_bridge if own_bridge else None
+        if target and target not in reachable_bridges:
+            report.issues.append(
+                ValidationIssue(
+                    level="warning",
+                    code="missing-bridge",
+                    message=(
+                        f"Action targets bridge '{target}' but no dcc.Store "
+                        "with that id was found in the layout."
+                    ),
+                    component_id=cid,
+                )
+            )
+        elif not target and not reachable_bridges:
+            report.issues.append(
+                ValidationIssue(
+                    level="warning",
+                    code="missing-bridge",
+                    message="Action has no bridge and no bridge is present in the layout.",
+                    component_id=cid,
+                )
             )
 
-    walk(layout, in_dynamic=False, inherited_bridge=None, region_name=None)
-
     if strict and report.issues:
-        messages = "\n".join(f"[{i.code}] {i.message}" for i in report.issues)
-        raise UnsafeLayoutError(messages)
+        lines = "\n".join(f"[{i.code}] {i.message}" for i in report.issues)
+        raise UnsafeLayoutError(lines)
 
-    if return_report:
-        return report
-    return None
+    return report

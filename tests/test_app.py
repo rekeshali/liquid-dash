@@ -1,12 +1,12 @@
 from dash import Dash, html
 
-from liquid_dash import configure
+import liquid_dash as ld
 
 
-def test_configure_registers_js_route_and_injects_script_tag() -> None:
+def test_melt_registers_js_route_and_injects_script_tag() -> None:
     app = Dash(__name__)
     app.layout = html.Div()
-    configure(app)
+    ld.melt(app)
 
     assert '<script src="/_liquid_dash/liquid_dash.js"></script>' in app.index_string
 
@@ -17,9 +17,9 @@ def test_configure_registers_js_route_and_injects_script_tag() -> None:
     assert "__liquidDashInstalled" in response.get_data(as_text=True)
 
 
-def test_configure_is_idempotent() -> None:
+def test_melt_is_idempotent() -> None:
     app = Dash(__name__)
-    configure(app)
-    configure(app)
+    ld.melt(app)
+    ld.melt(app)
 
     assert app.index_string.count('src="/_liquid_dash/liquid_dash.js"') == 1

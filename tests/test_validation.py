@@ -1,25 +1,40 @@
-from dash import html
+from dash import dcc, html
 
-from liquid_dash import DynamicRegion, StableRegion, action_button, validate_layout
+import liquid_dash as ld
 
 
-def test_validate_layout_flags_missing_bridge() -> None:
-    layout = StableRegion(
-        children=[
-            DynamicRegion(children=[action_button("Delete", action="card.delete")])
+def test_validate_flags_missing_bridge() -> None:
+    # Action targets a bridge id that doesn't exist as a dcc.Store in the layout.
+    layout = html.Div(
+        [
+            dcc.Store(id="bridge"),  # default bridge, but action points elsewhere
+            ld.on(html.Button("Delete"), "card.delete", to="ghost-bus"),
         ]
     )
-    report = validate_layout(layout, return_report=True)
+    report = ld.validate(layout)
     codes = {issue.code for issue in report.issues}
     assert "missing-bridge" in codes
 
 
-def test_validate_layout_flags_raw_interactive_in_dynamic_region() -> None:
-    layout = StableRegion(
-        children=[
-            DynamicRegion(bridge="ui-events", children=[html.Button("Plain")])
+def test_validate_flags_duplicate_ids() -> None:
+    layout = html.Div(
+        [
+            dcc.Store(id="dup"),
+            html.Div(id="dup"),
         ]
     )
-    report = validate_layout(layout, return_report=True)
+    report = ld.validate(layout)
     codes = {issue.code for issue in report.issues}
-    assert "raw-interactive-in-dynamic" in codes
+    assert "duplicate-id" in codes
+
+
+def test_validate_passes_on_clean_layout() -> None:
+    layout = html.Div(
+        [
+            ld.bridge(),
+            ld.on(html.Button("Add"), "add"),
+            ld.on(html.Button("Delete"), "delete", target="row-1"),
+        ]
+    )
+    report = ld.validate(layout)
+    assert report.ok, f"unexpected issues: {report.issues}"

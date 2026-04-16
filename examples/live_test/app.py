@@ -4,7 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 import sys
 
-from dash import Dash, Input, Output, State, dcc, html, no_update
+from dash import Dash, Input, Output, dcc, html, no_update
 
 # Allow running the demo directly from the source tree before installation.
 ROOT = Path(__file__).resolve().parents[2]
@@ -12,7 +12,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from liquid_dash import DynamicRegion, EventBridge, StableRegion, action_button, configure
+import liquid_dash as ld
 
 
 BADGE_COLORS = ["#2563eb", "#7c3aed", "#db2777", "#f59e0b", "#059669"]
@@ -23,7 +23,6 @@ KIND_SPECS = {
     "timeseries": {
         "label": "Time Series",
         "subtitle": "Trace styling and smoothing",
-        "icon": "wave",
         "type_color": "#2563eb",
         "settings": {
             "line_width": 2,
@@ -35,7 +34,6 @@ KIND_SPECS = {
     "histogram": {
         "label": "Histogram",
         "subtitle": "Distribution bins and normalization",
-        "icon": "bars",
         "type_color": "#f59e0b",
         "settings": {
             "bins": 12,
@@ -47,7 +45,6 @@ KIND_SPECS = {
     "scatter": {
         "label": "Scatter",
         "subtitle": "Marker sizing and overlays",
-        "icon": "dots",
         "type_color": "#db2777",
         "settings": {
             "marker_size": 6,
@@ -59,6 +56,27 @@ KIND_SPECS = {
 }
 
 
+# -- State helpers ----------------------------------------------------------
+
+def make_panel_state(index: int, kind: str) -> dict:
+    spec = KIND_SPECS[kind]
+    badges_seed = {
+        "timeseries": [{"label": "Hot", "color": "#2563eb"}],
+        "histogram": [{"label": "QA", "color": "#f59e0b"}],
+        "scatter": [{"label": "Draft", "color": "#db2777"}],
+    }
+    return {
+        "id": f"panel-{index}",
+        "kind": kind,
+        "title": f"{spec['label']} {index}",
+        "subtitle": spec["subtitle"],
+        "expanded": index == 1,
+        "locked": False,
+        "badges": list(badges_seed.get(kind, [])),
+        "settings": deepcopy(spec["settings"]),
+    }
+
+
 def default_state() -> dict:
     return {
         "next_index": 4,
@@ -67,28 +85,6 @@ def default_state() -> dict:
             make_panel_state(2, "histogram"),
             make_panel_state(3, "scatter"),
         ],
-    }
-
-
-def make_panel_state(index: int, kind: str) -> dict:
-    spec = KIND_SPECS[kind]
-    badges = []
-    if kind == "timeseries":
-        badges = [{"label": "Hot", "color": "#2563eb"}]
-    elif kind == "histogram":
-        badges = [{"label": "QA", "color": "#f59e0b"}]
-    elif kind == "scatter":
-        badges = [{"label": "Draft", "color": "#db2777"}]
-
-    return {
-        "id": f"panel-{index}",
-        "kind": kind,
-        "title": f"{spec['label']} {index}",
-        "subtitle": spec["subtitle"],
-        "expanded": index == 1,
-        "locked": False,
-        "badges": badges,
-        "settings": deepcopy(spec["settings"]),
     }
 
 
@@ -108,13 +104,11 @@ def cycle_kind(current_kind: str, new_kind: str | None) -> str:
 
 
 def add_badge(panel: dict) -> None:
-    badge_index = len(panel["badges"])
-    panel["badges"].append(
-        {
-            "label": BADGE_LIBRARY[badge_index % len(BADGE_LIBRARY)],
-            "color": BADGE_COLORS[badge_index % len(BADGE_COLORS)],
-        }
-    )
+    i = len(panel["badges"])
+    panel["badges"].append({
+        "label": BADGE_LIBRARY[i % len(BADGE_LIBRARY)],
+        "color": BADGE_COLORS[i % len(BADGE_COLORS)],
+    })
 
 
 def cycle_badge(panel: dict) -> None:
@@ -137,89 +131,116 @@ def apply_setting(panel: dict, payload: dict) -> None:
     key = payload.get("key")
     if not key:
         return
-
     if mode == "toggle":
         settings[key] = not bool(settings.get(key, False))
-        return
-
-    if mode == "bump":
+    elif mode == "bump":
         value = int(settings.get(key, 0))
         delta = int(payload.get("delta", 0))
         minimum = int(payload.get("minimum", 0))
         maximum = int(payload.get("maximum", 99))
         settings[key] = max(minimum, min(maximum, value + delta))
-        return
-
-    if mode == "cycle":
+    elif mode == "cycle":
         values = payload.get("values") or []
         settings[key] = cycle_value(settings.get(key), values)
 
 
+def find_panel(state: dict, panel_id: str | None) -> dict | None:
+    return next((p for p in state["panels"] if p["id"] == panel_id), None)
+
+
+# -- App & handlers ---------------------------------------------------------
+
+ASSETS = Path(__file__).with_name("assets")
+app = Dash(__name__, assets_folder=str(ASSETS))
+ld.melt(app)
+
+events = ld.handler(app, state="app-state")
+
+
+@events.on("panel.add")
+def _(state, payload, event):
+    kind = (payload or {}).get("kind", "timeseries")
+    state["panels"].append(make_panel_state(state["next_index"], kind))
+    state["next_index"] += 1
+
+
+@events.on("panel.delete")
+def _(state, payload, event):
+    tid = event.get("target")
+    state["panels"] = [p for p in state["panels"] if p["id"] != tid]
+
+
+@events.on("panel.duplicate")
+def _(state, payload, event):
+    panel = find_panel(state, event.get("target"))
+    if panel is None:
+        return
+    clone = deepcopy(panel)
+    clone["id"] = f"panel-{state['next_index']}"
+    clone["title"] = f"{panel['title']} Copy"
+    clone["expanded"] = True
+    state["next_index"] += 1
+    state["panels"].append(clone)
+
+
+@events.on("panel.drawer.toggle")
+def _(state, payload, event):
+    panel = find_panel(state, event.get("target"))
+    if panel is not None:
+        panel["expanded"] = not bool(panel.get("expanded"))
+
+
+@events.on("panel.lock.toggle")
+def _(state, payload, event):
+    panel = find_panel(state, event.get("target"))
+    if panel is not None:
+        panel["locked"] = not bool(panel.get("locked"))
+
+
+@events.on("panel.kind.set")
+def _(state, payload, event):
+    panel = find_panel(state, event.get("target"))
+    if panel is not None:
+        set_kind(panel, cycle_kind(panel["kind"], (payload or {}).get("kind")))
+
+
+@events.on("panel.badge.add")
+def _(state, payload, event):
+    panel = find_panel(state, event.get("target"))
+    if panel is not None:
+        add_badge(panel)
+
+
+@events.on("panel.badge.cycle")
+def _(state, payload, event):
+    panel = find_panel(state, event.get("target"))
+    if panel is not None:
+        cycle_badge(panel)
+
+
+@events.on("panel.badge.remove")
+def _(state, payload, event):
+    panel = find_panel(state, event.get("target"))
+    if panel is not None and panel["badges"]:
+        panel["badges"].pop()
+
+
+@events.on("panel.setting")
+def _(state, payload, event):
+    panel = find_panel(state, event.get("target"))
+    if panel is not None and payload:
+        apply_setting(panel, payload)
+
+
 def apply_event(state: dict, event: dict | None) -> dict:
+    """Thin wrapper used by tests: dispatches one liquid event through the registry."""
     if not event:
         return state
+    result = events.dispatch(event, state)
+    return state if result is no_update else result
 
-    action = event.get("action")
-    target = event.get("target")
-    payload = event.get("payload") or {}
 
-    next_state = deepcopy(state)
-    panels = next_state["panels"]
-
-    if action == "panel.add":
-        kind = payload.get("kind", "timeseries")
-        panels.append(make_panel_state(next_state["next_index"], kind))
-        next_state["next_index"] += 1
-        return next_state
-
-    panel = next((item for item in panels if item["id"] == target), None)
-    if panel is None:
-        return next_state
-
-    if action == "panel.delete":
-        next_state["panels"] = [item for item in panels if item["id"] != target]
-        return next_state
-
-    if action == "panel.duplicate":
-        clone = deepcopy(panel)
-        clone["id"] = f"panel-{next_state['next_index']}"
-        clone["title"] = f"{panel['title']} Copy"
-        clone["expanded"] = True
-        next_state["next_index"] += 1
-        panels.append(clone)
-        return next_state
-
-    if action == "panel.drawer.toggle":
-        panel["expanded"] = not bool(panel.get("expanded"))
-        return next_state
-
-    if action == "panel.lock.toggle":
-        panel["locked"] = not bool(panel.get("locked"))
-        return next_state
-
-    if action == "panel.kind.set":
-        set_kind(panel, cycle_kind(panel["kind"], payload.get("kind")))
-        return next_state
-
-    if action == "panel.badge.add":
-        add_badge(panel)
-        return next_state
-
-    if action == "panel.badge.cycle":
-        cycle_badge(panel)
-        return next_state
-
-    if action == "panel.badge.remove":
-        if panel["badges"]:
-            panel["badges"].pop()
-        return next_state
-
-    if action == "panel.setting":
-        apply_setting(panel, payload)
-        return next_state
-
-    return next_state
-
+# -- View helpers -----------------------------------------------------------
 
 def icon_for(kind: str):
     if kind == "timeseries":
@@ -227,7 +248,7 @@ def icon_for(kind: str):
     if kind == "histogram":
         heights = [24, 42, 60, 38, 28, 18, 10]
         return html.Div(
-            [html.Div(className="preview-bar", style={"height": f"{height}px"}) for height in heights],
+            [html.Div(className="preview-bar", style={"height": f"{h}px"}) for h in heights],
             className="preview-bars",
         )
     dots = [
@@ -239,7 +260,7 @@ def icon_for(kind: str):
         {"left": "84%", "top": "18%"},
     ]
     return html.Div(
-        [html.Div(className="preview-dot", style=dot_style) for dot_style in dots],
+        [html.Div(className="preview-dot", style=s) for s in dots],
         className="preview-scatter",
     )
 
@@ -249,52 +270,42 @@ def render_badges(panel: dict):
     if not badges:
         return html.Span("No badges", className="panel-muted")
     return html.Div(
-        [
-            html.Span(
-                badge["label"],
-                className="panel-badge",
-                style={"background": badge["color"]},
-            )
-            for badge in badges
-        ],
+        [html.Span(b["label"], className="panel-badge", style={"background": b["color"]}) for b in badges],
         className="panel-badge-row",
     )
 
 
 def stat_chip(label: str, value: str):
     return html.Div(
-        [
-            html.Div(label, className="panel-chip-label"),
-            html.Div(value, className="panel-chip-value"),
-        ],
+        [html.Div(label, className="panel-chip-label"), html.Div(value, className="panel-chip-value")],
         className="panel-chip",
     )
 
 
 def preview_metrics(panel: dict):
-    settings = panel["settings"]
+    s = panel["settings"]
     kind = panel["kind"]
     if kind == "timeseries":
         return [
-            stat_chip("Width", str(settings["line_width"])),
-            stat_chip("Style", settings["line_style"]),
-            stat_chip("Markers", "On" if settings["show_markers"] else "Off"),
+            stat_chip("Width", str(s["line_width"])),
+            stat_chip("Style", s["line_style"]),
+            stat_chip("Markers", "On" if s["show_markers"] else "Off"),
         ]
     if kind == "histogram":
         return [
-            stat_chip("Bins", str(settings["bins"])),
-            stat_chip("Normalize", "On" if settings["normalize"] else "Off"),
-            stat_chip("Cumulative", "On" if settings["cumulative"] else "Off"),
+            stat_chip("Bins", str(s["bins"])),
+            stat_chip("Normalize", "On" if s["normalize"] else "Off"),
+            stat_chip("Cumulative", "On" if s["cumulative"] else "Off"),
         ]
     return [
-        stat_chip("Size", str(settings["marker_size"])),
-        stat_chip("Trend", "On" if settings["trendline"] else "Off"),
-        stat_chip("Palette", settings["palette"]),
+        stat_chip("Size", str(s["marker_size"])),
+        stat_chip("Trend", "On" if s["trendline"] else "Off"),
+        stat_chip("Palette", s["palette"]),
     ]
 
 
 def settings_controls(panel: dict):
-    panel_id = panel["id"]
+    pid = panel["id"]
     kind = panel["kind"]
     settings = panel["settings"]
 
@@ -303,15 +314,14 @@ def settings_controls(panel: dict):
             html.Div("Retype panel", className="panel-section-title"),
             html.Div(
                 [
-                    action_button(
-                        KIND_SPECS[kind_name]["label"],
-                        action="panel.kind.set",
-                        target=panel_id,
-                        payload={"kind": kind_name},
-                        bridge="ui-events",
-                        className=("mini-btn is-active" if kind == kind_name else "mini-btn"),
+                    ld.on(
+                        html.Button(
+                            KIND_SPECS[k]["label"],
+                            className=("mini-btn is-active" if kind == k else "mini-btn"),
+                        ),
+                        "panel.kind.set", target=pid, payload={"kind": k},
                     )
-                    for kind_name in KIND_ORDER
+                    for k in KIND_ORDER
                 ],
                 className="mini-btn-row",
             ),
@@ -319,14 +329,20 @@ def settings_controls(panel: dict):
         className="settings-block",
     )
 
+    # One emitter per action, reused across buttons that share the same target.
+    badge_add = ld.on("panel.badge.add", target=pid)
+    badge_cycle = ld.on("panel.badge.cycle", target=pid)
+    badge_remove = ld.on("panel.badge.remove", target=pid)
+    setting = ld.on("panel.setting", target=pid)
+
     badges = html.Div(
         [
             html.Div("Badges", className="panel-section-title"),
             html.Div(
                 [
-                    action_button("Add", action="panel.badge.add", target=panel_id, bridge="ui-events", className="mini-btn"),
-                    action_button("Cycle Color", action="panel.badge.cycle", target=panel_id, bridge="ui-events", className="mini-btn"),
-                    action_button("Remove Last", action="panel.badge.remove", target=panel_id, bridge="ui-events", className="mini-btn"),
+                    badge_add(html.Button("Add", className="mini-btn")),
+                    badge_cycle(html.Button("Cycle Color", className="mini-btn")),
+                    badge_remove(html.Button("Remove Last", className="mini-btn")),
                 ],
                 className="mini-btn-row",
             ),
@@ -339,11 +355,16 @@ def settings_controls(panel: dict):
             html.Div("Trace controls", className="panel-section-title"),
             html.Div(
                 [
-                    action_button("Width -", action="panel.setting", target=panel_id, payload={"mode": "bump", "key": "line_width", "delta": -1, "minimum": 1, "maximum": 6}, bridge="ui-events", className="mini-btn"),
-                    action_button("Width +", action="panel.setting", target=panel_id, payload={"mode": "bump", "key": "line_width", "delta": 1, "minimum": 1, "maximum": 6}, bridge="ui-events", className="mini-btn"),
-                    action_button("Cycle Style", action="panel.setting", target=panel_id, payload={"mode": "cycle", "key": "line_style", "values": ["solid", "dash", "dot"]}, bridge="ui-events", className="mini-btn"),
-                    action_button("Toggle Markers", action="panel.setting", target=panel_id, payload={"mode": "toggle", "key": "show_markers"}, bridge="ui-events", className="mini-btn"),
-                    action_button("Smoothing", action="panel.setting", target=panel_id, payload={"mode": "cycle", "key": "smoothing", "values": ["off", "light", "heavy"]}, bridge="ui-events", className="mini-btn"),
+                    setting(html.Button("Width -", className="mini-btn"),
+                            payload={"mode": "bump", "key": "line_width", "delta": -1, "minimum": 1, "maximum": 6}),
+                    setting(html.Button("Width +", className="mini-btn"),
+                            payload={"mode": "bump", "key": "line_width", "delta": 1, "minimum": 1, "maximum": 6}),
+                    setting(html.Button("Cycle Style", className="mini-btn"),
+                            payload={"mode": "cycle", "key": "line_style", "values": ["solid", "dash", "dot"]}),
+                    setting(html.Button("Toggle Markers", className="mini-btn"),
+                            payload={"mode": "toggle", "key": "show_markers"}),
+                    setting(html.Button("Smoothing", className="mini-btn"),
+                            payload={"mode": "cycle", "key": "smoothing", "values": ["off", "light", "heavy"]}),
                 ],
                 className="mini-btn-row",
             ),
@@ -354,11 +375,16 @@ def settings_controls(panel: dict):
             html.Div("Distribution controls", className="panel-section-title"),
             html.Div(
                 [
-                    action_button("Bins -", action="panel.setting", target=panel_id, payload={"mode": "bump", "key": "bins", "delta": -2, "minimum": 4, "maximum": 24}, bridge="ui-events", className="mini-btn"),
-                    action_button("Bins +", action="panel.setting", target=panel_id, payload={"mode": "bump", "key": "bins", "delta": 2, "minimum": 4, "maximum": 24}, bridge="ui-events", className="mini-btn"),
-                    action_button("Normalize", action="panel.setting", target=panel_id, payload={"mode": "toggle", "key": "normalize"}, bridge="ui-events", className="mini-btn"),
-                    action_button("Cumulative", action="panel.setting", target=panel_id, payload={"mode": "toggle", "key": "cumulative"}, bridge="ui-events", className="mini-btn"),
-                    action_button("Reference Lines", action="panel.setting", target=panel_id, payload={"mode": "toggle", "key": "reference_lines"}, bridge="ui-events", className="mini-btn"),
+                    setting(html.Button("Bins -", className="mini-btn"),
+                            payload={"mode": "bump", "key": "bins", "delta": -2, "minimum": 4, "maximum": 24}),
+                    setting(html.Button("Bins +", className="mini-btn"),
+                            payload={"mode": "bump", "key": "bins", "delta": 2, "minimum": 4, "maximum": 24}),
+                    setting(html.Button("Normalize", className="mini-btn"),
+                            payload={"mode": "toggle", "key": "normalize"}),
+                    setting(html.Button("Cumulative", className="mini-btn"),
+                            payload={"mode": "toggle", "key": "cumulative"}),
+                    setting(html.Button("Reference Lines", className="mini-btn"),
+                            payload={"mode": "toggle", "key": "reference_lines"}),
                 ],
                 className="mini-btn-row",
             ),
@@ -369,69 +395,72 @@ def settings_controls(panel: dict):
             html.Div("Scatter controls", className="panel-section-title"),
             html.Div(
                 [
-                    action_button("Size -", action="panel.setting", target=panel_id, payload={"mode": "bump", "key": "marker_size", "delta": -1, "minimum": 2, "maximum": 12}, bridge="ui-events", className="mini-btn"),
-                    action_button("Size +", action="panel.setting", target=panel_id, payload={"mode": "bump", "key": "marker_size", "delta": 1, "minimum": 2, "maximum": 12}, bridge="ui-events", className="mini-btn"),
-                    action_button("Trendline", action="panel.setting", target=panel_id, payload={"mode": "toggle", "key": "trendline"}, bridge="ui-events", className="mini-btn"),
-                    action_button("Density", action="panel.setting", target=panel_id, payload={"mode": "toggle", "key": "density_overlay"}, bridge="ui-events", className="mini-btn"),
-                    action_button("Palette", action="panel.setting", target=panel_id, payload={"mode": "cycle", "key": "palette", "values": ["blue", "teal", "rose"]}, bridge="ui-events", className="mini-btn"),
+                    setting(html.Button("Size -", className="mini-btn"),
+                            payload={"mode": "bump", "key": "marker_size", "delta": -1, "minimum": 2, "maximum": 12}),
+                    setting(html.Button("Size +", className="mini-btn"),
+                            payload={"mode": "bump", "key": "marker_size", "delta": 1, "minimum": 2, "maximum": 12}),
+                    setting(html.Button("Trendline", className="mini-btn"),
+                            payload={"mode": "toggle", "key": "trendline"}),
+                    setting(html.Button("Density", className="mini-btn"),
+                            payload={"mode": "toggle", "key": "density_overlay"}),
+                    setting(html.Button("Palette", className="mini-btn"),
+                            payload={"mode": "cycle", "key": "palette", "values": ["blue", "teal", "rose"]}),
                 ],
                 className="mini-btn-row",
             ),
             html.Div(f"Density overlay: {'On' if settings['density_overlay'] else 'Off'}", className="panel-muted"),
         ]
 
-    return html.Div([html.Div(specifics, className="settings-block"), badges, retype], className="panel-settings")
+    return html.Div(
+        [html.Div(specifics, className="settings-block"), badges, retype],
+        className="panel-settings",
+    )
 
 
 def render_panel(panel: dict):
     spec = KIND_SPECS[panel["kind"]]
+    pid = panel["id"]
     locked = panel.get("locked", False)
+
+    header_actions = html.Div(
+        [
+            ld.on(
+                html.Button(
+                    "Settings",
+                    className=("panel-icon-btn is-active" if panel["expanded"] else "panel-icon-btn"),
+                ),
+                "panel.drawer.toggle", target=pid,
+            ),
+            ld.on(
+                html.Button(
+                    "Lock" if not locked else "Unlock",
+                    className=("panel-icon-btn is-active" if locked else "panel-icon-btn"),
+                ),
+                "panel.lock.toggle", target=pid,
+            ),
+            ld.on(html.Button("Duplicate", className="panel-icon-btn"),
+                  "panel.duplicate", target=pid),
+            ld.on(html.Button("Delete", className="panel-icon-btn danger"),
+                  "panel.delete", target=pid),
+        ],
+        className="panel-header-actions",
+    )
+
     return html.Div(
         [
             html.Div(
                 [
                     html.Div(
                         [
-                            html.Div(spec["label"], className="panel-type-pill", style={"background": spec["type_color"]}),
+                            html.Div(spec["label"], className="panel-type-pill",
+                                     style={"background": spec["type_color"]}),
                             html.Div(panel["title"], className="panel-title"),
                             html.Div(panel["subtitle"], className="panel-subtitle"),
                             render_badges(panel),
                         ],
                         className="panel-header-copy",
                     ),
-                    html.Div(
-                        [
-                            action_button(
-                                "Settings",
-                                action="panel.drawer.toggle",
-                                target=panel["id"],
-                                bridge="ui-events",
-                                className=("panel-icon-btn is-active" if panel["expanded"] else "panel-icon-btn"),
-                            ),
-                            action_button(
-                                "Lock" if not locked else "Unlock",
-                                action="panel.lock.toggle",
-                                target=panel["id"],
-                                bridge="ui-events",
-                                className=("panel-icon-btn is-active" if locked else "panel-icon-btn"),
-                            ),
-                            action_button(
-                                "Duplicate",
-                                action="panel.duplicate",
-                                target=panel["id"],
-                                bridge="ui-events",
-                                className="panel-icon-btn",
-                            ),
-                            action_button(
-                                "Delete",
-                                action="panel.delete",
-                                target=panel["id"],
-                                bridge="ui-events",
-                                className="panel-icon-btn danger",
-                            ),
-                        ],
-                        className="panel-header-actions",
-                    ),
+                    header_actions,
                 ],
                 className="panel-header",
             ),
@@ -442,74 +471,59 @@ def render_panel(panel: dict):
                 ],
                 className="panel-preview",
             ),
-            html.Div(settings_controls(panel), className="panel-drawer", style={} if panel["expanded"] else {"display": "none"}),
+            html.Div(
+                settings_controls(panel),
+                className="panel-drawer",
+                style={} if panel["expanded"] else {"display": "none"},
+            ),
         ],
         className="panel-card",
     )
 
 
-ASSETS = Path(__file__).with_name("assets")
-app = Dash(__name__, assets_folder=str(ASSETS))
-configure(app)
+# -- Layout -----------------------------------------------------------------
 
-app.layout = StableRegion(
-    id="shell",
-    region_name="shell",
+app.layout = html.Div(
     className="demo-shell",
     children=[
         dcc.Store(id="app-state", data=default_state()),
-        EventBridge(id="ui-events"),
+        ld.bridge(),
         html.Div(
             [
                 html.Div(
                     [
                         html.H1("liquid-dash panel playground"),
                         html.P(
-                            "Add different panel types, tweak settings inside each card, duplicate, retype, badge, and delete. "
-                            "The whole panel surface is rebuilt from state each time."
+                            "Add panel types, tweak settings, duplicate, retype, badge, and delete. "
+                            "The panel surface is rebuilt from state each time."
                         ),
                     ]
                 ),
                 html.Div(
                     [
-                        action_button("Add Time Series", action="panel.add", payload={"kind": "timeseries"}, bridge="ui-events", className="add-panel-btn"),
-                        action_button("Add Histogram", action="panel.add", payload={"kind": "histogram"}, bridge="ui-events", className="add-panel-btn"),
-                        action_button("Add Scatter", action="panel.add", payload={"kind": "scatter"}, bridge="ui-events", className="add-panel-btn"),
+                        ld.on(html.Button("Add Time Series", className="add-panel-btn"),
+                              "panel.add", payload={"kind": "timeseries"}),
+                        ld.on(html.Button("Add Histogram", className="add-panel-btn"),
+                              "panel.add", payload={"kind": "histogram"}),
+                        ld.on(html.Button("Add Scatter", className="add-panel-btn"),
+                              "panel.add", payload={"kind": "scatter"}),
                     ],
                     className="toolbar-row",
                 ),
             ],
             className="hero-block",
         ),
-        DynamicRegion(
-            id="panel-grid",
-            bridge="ui-events",
-            region_name="panel-grid",
-            className="panel-grid",
-            children=[],
-        ),
+        html.Div(id="panel-grid", className="panel-grid"),
     ],
 )
 
 
-@app.callback(
-    Output("app-state", "data"),
-    Input("ui-events", "data"),
-    State("app-state", "data"),
-    prevent_initial_call=True,
-)
-def handle_event(event, state):
-    if not event:
-        return no_update
-    return apply_event(state, event)
-
-
 @app.callback(Output("panel-grid", "children"), Input("app-state", "data"))
 def render_panels(state):
-    panels = state.get("panels", [])
+    panels = (state or {}).get("panels", [])
     if not panels:
         return [html.Div("No panels left. Add a new one from the toolbar.", className="empty-state")]
-    return [render_panel(panel) for panel in panels]
+    return [render_panel(p) for p in panels]
 
 
 if __name__ == "__main__":

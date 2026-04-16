@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from importlib import resources
 
-from .validation import validate_layout
-
 
 _ASSET_NAME = "liquid_dash.js"
 _ASSET_ROUTE = "/_liquid_dash/liquid_dash.js"
@@ -39,10 +37,11 @@ def _register_asset(app) -> None:
         )
 
 
-def configure(app, *, register_asset: bool = True, validate: bool = False):
-    """Prepare a Dash app to use liquid_dash helpers."""
+def melt(app, *, register_asset: bool = True):
+    """Prepare a Dash app to carry liquid-dash events.
+
+    Installs the client-side event handler and returns the app.
+    """
     if register_asset:
         _register_asset(app)
-    if validate and getattr(app, "layout", None) is not None:
-        validate_layout(app.layout)
     return app

@@ -3,17 +3,13 @@ from __future__ import annotations
 from dash import dcc
 
 
-def EventBridge(
-    id: str,
-    *,
-    data: dict | None = None,
-    storage_type: str = "memory",
-    clear_on_read: bool = False,
-):
-    """Return a stable dcc.Store used as a delegated event sink."""
-    return dcc.Store(
-        id=id,
-        data=data,
-        storage_type=storage_type,
-        clear_data=clear_on_read,
-    )
+DEFAULT_BRIDGE_ID = "bridge"
+
+
+def bridge(id: str = DEFAULT_BRIDGE_ID) -> dcc.Store:
+    """Return a dcc.Store that acts as the event sink for liquid-dash.
+
+    Drop this component into your layout once per bridge you need. The default
+    id `"bridge"` matches what `on()` and `handler()` target by default.
+    """
+    return dcc.Store(id=id, data=None, storage_type="memory")
