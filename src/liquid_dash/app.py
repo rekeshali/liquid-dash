@@ -38,7 +38,7 @@ def _register_asset(app) -> None:
 
 
 def melt(app, *, register_asset: bool = True):
-    """Prepare a Dash app to carry liquid-dash events.
+    """Prepare a Dash app to carry Liquid Dash events.
 
     Installs the client-side event handler and returns the app.
     """

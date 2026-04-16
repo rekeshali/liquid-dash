@@ -492,7 +492,7 @@ app.layout = html.Div(
             [
                 html.Div(
                     [
-                        html.H1("liquid-dash panel playground"),
+                        html.H1("Liquid Dash panel playground"),
                         html.P(
                             "Add panel types, tweak settings, duplicate, retype, badge, and delete. "
                             "The panel surface is rebuilt from state each time."

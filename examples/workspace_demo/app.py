@@ -975,7 +975,7 @@ def build_app() -> Dash:
                 [
                     html.Div(
                         [
-                            html.Div("liquid-dash demo", className="proof-kicker"),
+                            html.Div("Liquid Dash demo", className="proof-kicker"),
                             html.H1("Folders, tabs, and panels with a fixed callback graph",
                                     className="proof-title"),
                             html.P(

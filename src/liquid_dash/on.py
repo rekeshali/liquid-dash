@@ -56,7 +56,7 @@ def on(
     source: Any = None,
     prevent_default: bool = False,
 ) -> Any:
-    """Attach a liquid-dash event to a Dash component.
+    """Attach a Liquid Dash event to a Dash component.
 
     Two forms:
 

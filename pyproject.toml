@@ -9,7 +9,7 @@ description = "Small helpers for building more dynamic, app-like interfaces in D
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
-  { name = "liquid-dash contributors" }
+  { name = "Liquid Dash contributors" }
 ]
 dependencies = [
   "dash>=2.16",

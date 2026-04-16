@@ -47,7 +47,7 @@ def _iter_children(children: Any):
 
 
 def validate(layout, *, strict: bool = False) -> ValidationReport:
-    """Walk a Dash layout for common liquid-dash mistakes.
+    """Walk a Dash layout for common Liquid Dash mistakes.
 
     Reports:
       - duplicate-id: two components share an id

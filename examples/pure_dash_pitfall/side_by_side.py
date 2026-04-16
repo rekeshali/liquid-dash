@@ -1,4 +1,4 @@
-"""Pure-Dash and liquid-dash side by side, in one Dash app.
+"""Pure Dash and Liquid Dash side by side, in one Dash app.
 
 Two implementations of the same toggleable, filterable, growable list,
 mounted in two columns. Each column has an in-page console that logs
@@ -9,9 +9,9 @@ Run:
     python examples/pure_dash_pitfall/side_by_side.py
 
 Click "Add item" once on each side and compare the consoles. The
-pure-Dash side fires multiple callbacks per click (including phantom
-fires that mutate state); the liquid-dash side fires exactly two
-(bridge dispatch + renderer).
+pure-Dash column fires multiple callbacks per click (including extra
+fires triggered by remounted ALL-pattern subscribers); the Liquid Dash
+column fires exactly two (bridge dispatch + renderer).
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ _INITIAL_ITEMS = [
 # Injected into <head> so the fetch interceptor is in place before the
 # Dash renderer makes its first network call. Each `_dash-update-component`
 # request is parsed, attributed to a side by output id prefix (pd- vs ld-),
-# and appended to that side's console panel. Pure ground-truth — what the
+# and appended to that side's console panel. Ground truth — what the
 # console shows is exactly what hit the wire.
 _CONSOLE_JS = r"""
 <script>
@@ -180,7 +180,7 @@ def pd_toggle(_clicks, s):
 
 
 # ---------------------------------------------------------------------------
-# liquid-dash column (id prefix: ld-)
+# Liquid Dash column (id prefix: ld-)
 # ---------------------------------------------------------------------------
 
 
@@ -284,7 +284,10 @@ def _column(title, controls, list_id, console_id):
 
 app.layout = html.Div(
     [
-        html.H1("Pure-Dash vs liquid-dash", style={"marginBottom": "4px"}),
+        html.H1(
+            "Dynamically Generated Components: Pure Dash vs. Liquid Dash",
+            style={"marginBottom": "4px"},
+        ),
         html.P(
             "Same UX, two implementations. Each column logs every "
             "_dash-update-component fire to its own console. Click around "
@@ -306,7 +309,7 @@ app.layout = html.Div(
                     "pd-console",
                 ),
                 _column(
-                    "liquid-dash",
+                    "Liquid Dash",
                     [
                         ld.on(html.Button("Toggle filter (all <-> open)"), "filter", to="ld-bridge"),
                         ld.on(html.Button("Add item"), "add", to="ld-bridge"),

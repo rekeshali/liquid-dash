@@ -1,4 +1,4 @@
-"""liquid_dash — minimal client-side event delegation for Dash.
+"""Liquid Dash — minimal client-side event delegation for Dash.
 
 Canonical import:
 

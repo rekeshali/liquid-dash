@@ -34,7 +34,7 @@ class Registry:
 
       * The state passed to the handler is a deep copy, safe to mutate.
       * ``payload`` is the user-defined payload supplied to ``ld.on(...)``.
-      * ``event`` is the full liquid-dash event dict with keys:
+      * ``event`` is the full Liquid Dash event dict with keys:
         ``action``, ``target``, ``source``, ``bridge``, ``event_type``,
         ``native``, ``timestamp``. ``event["native"]`` contains browser-level
         scalar fields (value, checked, key, clientX/Y, etc.).

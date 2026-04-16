@@ -1,9 +1,9 @@
-# liquid-dash
+# Liquid Dash
 
 A tiny layer for building **dynamic Dash interfaces** without wiring a
 callback per interactive element.
 
-![liquid-dash demo](examples/workspace_demo/liquid-dash-demo.gif)
+![Liquid Dash demo](examples/workspace_demo/liquid-dash-demo.gif)
 
 ## Why it exists
 
@@ -12,7 +12,7 @@ parts of the UI are rebuilt at runtime, when the same interaction pattern
 repeats in many places, or when interactive elements live inside regions
 that come and go.
 
-`liquid-dash` moves UI events off the Dash callback graph and onto a
+Liquid Dash moves UI events off the Dash callback graph and onto a
 single client-side bridge. You wrap existing Dash components with one
 call; events flow into a `dcc.Store`; one server-side handler dispatches
 them. Layouts can be rerendered freely without touching the callback
@@ -124,7 +124,7 @@ handlers with `@events.on("action")`. Handlers have signature
 
 - `state` — a deep copy of the state store (safe to mutate)
 - `payload` — the user-defined payload from `ld.on(..., payload=...)`
-- `event` — the full liquid-dash event dict
+- `event` — the full Liquid Dash event dict
   (`action`, `target`, `source`, `event_type`, `native`, `timestamp`)
 
 `event["native"]` carries browser-level fields extracted from the
