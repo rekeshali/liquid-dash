@@ -360,6 +360,25 @@ def _render_ld_column(state):
 
 _CONSOLE_JS = r"""
 <style>
+  .tl-runbtn {
+    margin-left: auto;
+    padding: 4px 12px;
+    background: #111;
+    color: white;
+    border: 0;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .tl-runbtn:hover { background: #333; }
+  .tl-runbtn:disabled { background: #999; cursor: wait; }
+  .tl-summary {
+    display: flex; gap: 16px; margin-top: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px; color: #555;
+  }
+  .tl-summary b { color: #111; font-weight: 600; }
   .tl-row {
     display: flex; align-items: center; gap: 8px;
     padding: 4px 6px; border-bottom: 1px solid #eee;
@@ -517,6 +536,21 @@ _CONSOLE_JS = r"""
     startRow(side, label);
   }, true);
 
+  // Running totals per side
+  var totals = {
+    pd: { runs: 0, trips: 0, bytes: 0 },
+    ld: { runs: 0, trips: 0, bytes: 0 },
+  };
+  function refreshSummary(side) {
+    var el = document.getElementById(side + "-summary");
+    if (!el) return;
+    var t = totals[side];
+    el.innerHTML =
+      '<span>Tests run: <b>' + t.runs + '</b></span>' +
+      '<span>Round-trips: <b>' + t.trips + '</b></span>' +
+      '<span>Total: <b>' + fmtBytes(t.bytes) + '</b></span>';
+  }
+
   window.fetch = function () {
     var args = arguments;
     var url = typeof args[0] === "string" ? args[0] : args[0].url;
@@ -538,9 +572,95 @@ _CONSOLE_JS = r"""
       var label = (out || "?").split("@")[0];
       appendRaw(side, stamp + "  " + label + "  (" + fmtBytes(bytes) + ")  <-  " + shortTrig(trig));
       addRoundTrip(side, bytes);
+      totals[side].trips += 1;
+      totals[side].bytes += bytes;
+      refreshSummary(side);
     }
     return origFetch.apply(this, args);
   };
+
+  // ---- Test runner ----
+  // Same sequence fired on both sides. Each step waits long enough for the
+  // previous click's round-trips to settle before issuing the next click.
+  var TEST_SEQUENCE = [
+    { kind: "text", text: "+ Folder" },
+    { kind: "text", text: "+ Tab" },
+    { kind: "text", text: "+ timeseries" },
+    { kind: "text", text: "+ histogram" },
+    { kind: "text", text: "+ scatter" },
+    { kind: "panel", which: "first", btn: "dup" },
+    { kind: "panel", which: "first", btn: "\u00d7" },  // delete first panel
+    { kind: "text", text: "+ Folder" },
+    { kind: "text", text: "+ timeseries" },
+  ];
+
+  function clickByText(side, text) {
+    var root = document.getElementById(side + "-root");
+    if (!root) return false;
+    var btns = root.querySelectorAll("button");
+    for (var i = 0; i < btns.length; i++) {
+      if (btns[i].textContent.trim() === text) { btns[i].click(); return true; }
+    }
+    return false;
+  }
+
+  function clickFirstPanelButton(side, btnText) {
+    var root = document.getElementById(side + "-root");
+    if (!root) return false;
+    // panel cards are divs that contain a 'Panel p-N' label div
+    var divs = root.querySelectorAll("div");
+    for (var i = 0; i < divs.length; i++) {
+      var d = divs[i];
+      var firstChild = d.firstElementChild;
+      if (firstChild && /^Panel p-\d+$/.test(firstChild.textContent || "")) {
+        var btns = d.querySelectorAll("button");
+        for (var j = 0; j < btns.length; j++) {
+          if (btns[j].textContent.trim() === btnText) { btns[j].click(); return true; }
+        }
+      }
+    }
+    return false;
+  }
+
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+
+  async function runTest(side) {
+    var btn = document.getElementById(side + "-runbtn");
+    if (btn) btn.disabled = true;
+    totals[side].runs += 1;
+    refreshSummary(side);
+    try {
+      for (var i = 0; i < TEST_SEQUENCE.length; i++) {
+        var step = TEST_SEQUENCE[i];
+        if (step.kind === "text") {
+          clickByText(side, step.text);
+        } else if (step.kind === "panel") {
+          clickFirstPanelButton(side, step.btn);
+        }
+        await sleep(900);
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+  window.__runNestedTest = runTest;  // expose for tests
+
+  // Wire run buttons once the Dash layout has mounted them.
+  var wireTries = 0;
+  function tryWire() {
+    var pdBtn = document.getElementById("pd-runbtn");
+    var ldBtn = document.getElementById("ld-runbtn");
+    if (pdBtn && ldBtn) {
+      pdBtn.addEventListener("click", function () { runTest("pd"); });
+      ldBtn.addEventListener("click", function () { runTest("ld"); });
+      refreshSummary("pd");
+      refreshSummary("ld");
+      return;
+    }
+    wireTries += 1;
+    if (wireTries < 60) setTimeout(tryWire, 100);
+  }
+  tryWire();
 })();
 </script>
 """
@@ -831,7 +951,7 @@ _PD_LINES = _count_source_lines("PD-ACTIONS-BEGIN", "PD-ACTIONS-END")
 _LD_LINES = _count_source_lines("LD-ACTIONS-BEGIN", "LD-ACTIONS-END")
 
 
-def _column(title, cb_count, line_count, root_id, timeline_id, console_id):
+def _column(title, cb_count, line_count, root_id, timeline_id, console_id, summary_id, runbtn_id):
     stat_style = {"fontSize": "11px", "color": "#666",
                   "fontFamily": "ui-monospace, monospace",
                   "padding": "2px 8px", "background": "#eee", "borderRadius": "10px"}
@@ -840,6 +960,7 @@ def _column(title, cb_count, line_count, root_id, timeline_id, console_id):
             html.H2(title, style={"margin": 0}),
             html.Span(f"{cb_count} callbacks", style=stat_style),
             html.Span(f"{line_count} lines of wiring", style=stat_style),
+            html.Button("\u25b6 Run test", id=runbtn_id, className="tl-runbtn"),
         ], style={"display": "flex", "alignItems": "center", "gap": "8px", "marginBottom": "16px"}),
         html.Div(id=root_id),
         html.Hr(),
@@ -851,6 +972,7 @@ def _column(title, cb_count, line_count, root_id, timeline_id, console_id):
             ),
         ]),
         html.Div(id=timeline_id, className="tl-panel"),
+        html.Div(id=summary_id, className="tl-summary"),
         html.Div(
             "raw callback log (live):",
             style={"fontSize": "12px", "color": "#666", "marginTop": "12px"},
@@ -881,8 +1003,10 @@ app.layout = html.Div([
     dcc.Store(id="ld-state", data=initial_state()),
     ld.bridge("ld-bridge"),
     html.Div([
-        _column("Pure Dash", _PD_CB_COUNT, _PD_LINES, "pd-root", "pd-timeline", "pd-console"),
-        _column("Liquid Dash", _LD_CB_COUNT, _LD_LINES, "ld-root", "ld-timeline", "ld-console"),
+        _column("Pure Dash", _PD_CB_COUNT, _PD_LINES, "pd-root", "pd-timeline",
+                "pd-console", "pd-summary", "pd-runbtn"),
+        _column("Liquid Dash", _LD_CB_COUNT, _LD_LINES, "ld-root", "ld-timeline",
+                "ld-console", "ld-summary", "ld-runbtn"),
     ], style={"display": "flex", "gap": "20px", "alignItems": "stretch"}),
 ], style={
     "fontFamily": "system-ui, -apple-system, sans-serif",
