@@ -26,14 +26,17 @@ once things start moving.
 ```python
 import dash_relay as relay
 
-relay.install(app)                      # install the client-side runtime once
-relay.bridge()                          # a dcc.Store sink (put it in the layout)
-relay.emitter(component, action, ...)   # wrap a component as an event emitter
-relay.registry(app, state="...")        # registry for server-side handlers
-relay.validate(layout)                  # optional linter
+relay.install(app)                          # install the client-side runtime once
+relay.bridge()                              # a dcc.Store sink (put it in the layout)
+relay.emitter(component, action, ...)       # wrap a component as an event emitter
+events = relay.registry(app, state="...")   # registry for server-side handlers
+relay.validate(layout)                      # optional linter
+
+@events.handler("action")                   # one per action — registers the handler
+def _(state, payload, event): ...
 ```
 
-Five names. That's it.
+Five functions and one decorator. That's it.
 
 ## A complete app
 
@@ -94,62 +97,96 @@ if __name__ == "__main__":
 
 ## The pieces
 
-**`relay.install(app)`** — installs a ~130-line client-side script that
-watches the DOM for elements carrying `data-relay-event` attributes and
-lazily binds document-level listeners for whatever DOM events it finds.
-No event whitelist: listeners register in capture phase, so non-bubbling
-events like `focus` and `blur` work too. `tests/test_event_types.py`
-verifies twelve event types end-to-end through a real browser (click,
-dblclick, input, change, submit, keydown, contextmenu, pointerdown,
-wheel, focus, blur, and custom events dispatched via
-`element.dispatchEvent(new CustomEvent(...))`).
+### `relay.install(app)`
 
-**`relay.bridge(id="bridge")`** — returns a `dcc.Store` with an id
-matching the default that `emitter()` and `registry()` target. Drop it
-in the layout. Name it explicitly (`relay.bridge("analytics")`) if you
-need more than one.
+Installs a ~130-line client-side script that watches the DOM for
+elements carrying `data-relay-event` attributes and lazily binds
+document-level listeners for whatever event types it finds. The
+runtime is event-agnostic: `event=` accepts any DOM event string —
+including non-bubbling ones like `focus`/`blur` and custom events
+dispatched via `element.dispatchEvent(new CustomEvent(...))`.
 
-**`relay.emitter(component, action, ...)`** — wraps a Dash component in
-a transparent `display: contents` div carrying the event metadata.
-Works with `html.*`, `dcc.*`, and third-party components alike because
-the wrapper owns the data attributes. Accepts:
+### `relay.bridge(id="bridge")`
 
-- `payload=` — JSON-serializable value passed to the handler
-- `event=` — DOM event name (default `"click"`)
-- `to=` — target bridge id (default `"bridge"`)
-- `target=`, `source=` — optional context values on the event
-  (any JSON-serializable; types round-trip to the handler)
-- `prevent_default=True` — calls `event.preventDefault()` client-side
+Returns a `dcc.Store` that acts as the event sink. Drop one in the
+layout. The default id `"bridge"` matches what `emitter()` and
+`registry()` target. Use `relay.bridge("analytics")` if you need more
+than one bridge.
 
-Curried form: `relay.emitter(action, ...)` with no component returns a
-reusable emitter factory, convenient for list rendering:
+### `relay.emitter(component, action, ...)`
+
+Wraps a Dash component in a transparent `display: contents` div that
+carries the event metadata. Works with `html.*`, `dcc.*`, and
+third-party components alike — the wrapper owns the attributes, not
+the component.
+
+**Keyword arguments:**
+
+| kwarg | purpose | default |
+|---|---|---|
+| `payload=` | JSON-serializable value passed to the handler | `None` |
+| `event=` | DOM event name | `"click"` |
+| `to=` | target bridge id | `"bridge"` |
+| `target=`, `source=` | context values on the event (any JSON-serializable; types round-trip) | `None` |
+| `prevent_default=` | calls `event.preventDefault()` client-side | `False` |
+
+**Curried form.** Called with just an action string, `emitter()` returns
+a reusable factory — convenient for list rendering:
 
 ```python
 delete = relay.emitter("delete")
 [delete(html.Button("x"), payload={"id": t["id"]}) for t in items]
 ```
 
-**`relay.registry(app, state="store_id")`** — registers one internal
-Dash callback wired from the bridge to the state store. Register
-per-action handlers with `@events.handler("action")`. Handlers have
-signature `(state, payload, event) -> new_state | None`:
+### `relay.registry(app, state="store_id")`
 
-- `state` — a deep copy of the state store (safe to mutate)
-- `payload` — the user-defined payload from `relay.emitter(..., payload=...)`
-- `event` — the full Dash Relay event dict
-  (`action`, `target`, `source`, `event_type`, `native`, `timestamp`)
+Returns a `Registry` and registers one internal Dash callback wired
+from the bridge to the state store. Accepts a single store id for the
+common case or `state=["a", "b", ...]` for apps that update multiple
+stores from one bridge. Attach per-action logic with
+`@events.handler("action")` (below).
 
-`event["native"]` carries browser-level fields extracted from the
-original DOM event: `value`, `checked`, `key`, `clientX/Y`, `deltaX/Y`,
-etc. Pick whatever you need.
+**Escape hatch.** For apps that don't fit the registry shape at all,
+skip `registry()` and write a normal `@app.callback(Input("bridge",
+"data"), ...)` yourself.
 
-For apps that don't fit the single-state-store shape (e.g. multiple
-stores updated from one bridge), skip `registry()` and write a normal
-`@app.callback(Input("bridge", "data"), ...)`.
+### `@events.handler(action)`
 
-**`relay.validate(layout)`** — walks the layout and reports duplicate
-ids, empty actions, and actions targeting bridge ids with no matching
-`dcc.Store`. Optional. Run it during development.
+Decorator on the registry object — where per-action application logic
+lives. One decorator per action name.
+
+```python
+events = relay.registry(app, state="state")
+
+@events.handler("add")
+def _(state, payload, event):
+    state["items"].append(...)
+```
+
+**Handler signature:** `(state, payload, event) -> new_state | None`
+
+| arg | what it is |
+|---|---|
+| `state` | a deep copy of the state store — safe to mutate in place |
+| `payload` | the user-defined payload from `relay.emitter(..., payload=...)` |
+| `event` | the full Dash Relay event dict (keys below) |
+
+Returning `None` keeps the mutated deep copy. Returning a value replaces
+the store with that value.
+
+**Event dict keys:** `action`, `target`, `source`, `event_type`,
+`native`, `timestamp`, `bridge`. `event["native"]` carries browser-level
+fields extracted from the original DOM event — `value`, `checked`,
+`key`, `clientX/Y`, `deltaX/Y`, etc.
+
+### `relay.validate(layout)`
+
+Optional development-time linter. Walks the layout and reports:
+
+- **duplicate ids** — two components sharing the same id
+- **empty actions** — an emitter with an empty action string
+- **missing bridge** — an emitter targeting a bridge id that isn't
+  present as a `dcc.Store` in the layout
 
 ## Installation
 
