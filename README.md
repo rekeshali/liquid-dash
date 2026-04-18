@@ -92,9 +92,12 @@ if __name__ == "__main__":
 **`relay.install(app)`** — installs a ~120-line client-side script that
 watches the DOM for elements carrying `data-relay-event` attributes and
 lazily binds document-level listeners for whatever DOM events it finds.
-No event whitelist: `"click"`, `"input"`, `"change"`, `"submit"`,
-`"dblclick"`, `"contextmenu"`, `"pointerdown"`, or any other DOM event
-string works out of the box.
+No event whitelist: listeners register in capture phase, so non-bubbling
+events like `focus` and `blur` work too. `tests/test_event_types.py`
+verifies twelve event types end-to-end through a real browser (click,
+dblclick, input, change, submit, keydown, contextmenu, pointerdown,
+wheel, focus, blur, and custom events dispatched via
+`element.dispatchEvent(new CustomEvent(...))`).
 
 **`relay.bridge(id="bridge")`** — returns a `dcc.Store` with an id
 matching the default that `emitter()` and `registry()` target. Drop it
@@ -159,9 +162,25 @@ python examples/workspace_demo/app.py  # nested folders/tabs/panels
 ## Development
 
 ```bash
-pip install -e .
-pytest
+pip install -e .[dev]
+pytest                                    # 29 unit tests
 ```
+
+### Integration tests (real browser)
+
+`tests/test_event_types.py` launches the app in a background thread
+and drives a headless Chromium via Playwright to verify every claimed
+DOM event type actually flows to the bridge. Opt-in because of the
+browser-binary footprint:
+
+```bash
+pip install -e .[integration]
+playwright install chromium
+pytest tests/test_event_types.py -v     # 15 browser-driven tests
+```
+
+The file auto-skips if `playwright` isn't installed, so the default
+`pytest` run stays lightweight.
 
 ## License
 

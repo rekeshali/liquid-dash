@@ -72,7 +72,10 @@ def emitter(
             those supplied to `emitter()`.
 
     Any DOM event name works for `event=`. The client-side handler registers
-    listeners lazily as new event names appear in the layout.
+    listeners in capture phase, lazily, as new event names appear in the
+    layout — so non-bubbling events (`focus`, `blur`) and custom events
+    dispatched via `element.dispatchEvent(new CustomEvent(...))` work too.
+    See `tests/test_event_types.py` for the verified matrix.
     """
     kw = {
         "payload": payload,
