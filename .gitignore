@@ -212,3 +212,6 @@ __marimo__/
 .playwright-mcp/
 # Transient Playwright screenshots dropped at the repo root during testing.
 /*.png
+
+# Claude Code per-project state
+.claude/
