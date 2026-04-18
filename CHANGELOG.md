@@ -4,6 +4,25 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-04-18
+
+PyPI polish only — no library code changes.
+
+### Fixed
+- Hero image on the PyPI project page. 1.0.0's README used a relative
+  path (`examples/.../comparison-demo.gif`); GitHub resolves relative
+  paths against the repo but PyPI renders the long description in
+  isolation, so the image showed as a broken placeholder. Switched to
+  an absolute `raw.githubusercontent.com` URL so both surfaces render.
+
+### Added (metadata)
+- `[project.urls]` with Homepage, Repository, Issues, Changelog — PyPI
+  now shows a "Project links" sidebar.
+- Richer classifiers: `Development Status :: 5 - Production/Stable`,
+  `Framework :: Dash`, per-Python-version markers for 3.10 / 3.11 /
+  3.12, and `Topic :: Software Development :: Libraries :: Python
+  Modules`.
+
 ## [1.0.0] — 2026-04-18
 
 First release under the `dash-relay` name. This package replaces `liquid-dash`
