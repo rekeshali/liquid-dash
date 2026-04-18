@@ -1,16 +1,21 @@
 """Nested dynamic surface: Folders -> Tabs -> Panels, two ways.
 
-The flat toggleable list in ``side_by_side.py`` is small enough that pure
-Dash is fine. This demo moves up to workspace-shaped complexity — three
-nested entity types, unbounded at each level, with ~9 action types — to
-show where approach A ("pattern-matching callbacks done right with the
-canonical guard") stops scaling cleanly.
+A workspace-shaped surface — three nested entity types, unbounded at
+each level, with nine action types — implemented two ways so the wiring
+cost of each pattern is directly comparable.
+
+- Left column: pattern-matching callbacks, written with the canonical
+  guard (`if not ctx.triggered_id or ctx.triggered[0]["value"] is None`)
+  so phantom fires from remounted subscribers return no_update cleanly.
+  Idiomatic modern Dash.
+- Right column: the Dash Relay event bridge with per-action reducers
+  registered on a single dispatch callback.
 
 Both columns implement the same surface and call the same state-mutation
 helpers. The difference is the plumbing between the UI and those helpers.
 
 Run:
-    python examples/pure_dash_pitfall/nested_side_by_side.py
+    python examples/pattern_matching_vs_event_bridge/nested_side_by_side.py
 
 Click around in either column and compare:
   - callbacks registered (shown in each column header)

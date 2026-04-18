@@ -1,12 +1,19 @@
-# Pure Dash vs Dash Relay
+# Pattern-matching callbacks vs. the event bridge
 
-Nested workspace surface — Folders → Tabs → Panels with 9 action types
+A nested workspace surface — Folders → Tabs → Panels with 9 action types
 across 3 entity levels — implemented two ways in one Dash app. Each
 column calls the same state-mutation helpers. Only the wiring between
 the UI and those helpers differs.
 
+- **Left column: pattern-matching callbacks**, written with the
+  canonical guard so phantom fires from remounted ALL-pattern
+  subscribers return `no_update` cleanly. This is idiomatic modern
+  Dash.
+- **Right column: the Dash Relay event bridge** with per-action
+  reducers registered on a single dispatch callback.
+
 ```bash
-python examples/pure_dash_pitfall/nested_side_by_side.py
+python examples/pattern_matching_vs_event_bridge/nested_side_by_side.py
 ```
 
 Each column has a **▶ Run test** button that plays the same 9-click
@@ -28,36 +35,36 @@ numbers grow with use.
 
 | | callback graph | round-trips | bytes | wall time (click → last response) |
 |---|---|---|---|---|
-| Pure Dash column | 10 callbacks | ~88 | ~108 KB | ~1.7 s |
-| Dash Relay column | 2 callbacks + 9 reducers | ~18 | ~18 KB | ~0.6 s |
-| Dash Relay win | ~80% smaller graph | ~80% fewer | ~84% less | ~63% faster |
+| Pattern-matching column | 10 callbacks | ~88 | ~108 KB | ~1.7 s |
+| Event-bridge column | 2 callbacks + 9 reducers | ~18 | ~18 KB | ~0.6 s |
+| Event-bridge delta | ~80% smaller graph | ~80% fewer | ~84% less | ~63% faster |
 
 Percentages are stable across runs (both columns scale proportionally).
 Absolute numbers grow per run because each click operates on more
-state — which is exactly where Pure Dash's per-trip payload cost
-scales linearly and Dash Relay's doesn't.
+state — which is exactly where the pattern-matching column's per-trip
+payload cost scales linearly and the event-bridge column's doesn't.
 
 ### What "2 callbacks + 9 reducers" means
 
 Both sides have the same number of *actions* (9). The difference is
 whether those actions are first-class Dash callbacks.
 
-- **Pure Dash:** one Dash callback per action type (9) + renderer (1) =
-  **10 in the callback graph**. Every action callback is a
-  pattern-matching subscriber. Adding a new action adds a new pattern
-  callback.
-- **Dash Relay:** one Dash callback for dispatch (1) + renderer (1) =
-  **2 in the callback graph**. Per-action logic lives as 9 reducers
-  registered on the dispatch callback's action registry
-  (`@events.handle("action")`). Adding a new action is a new reducer —
-  not a new Dash callback, not a new pattern-matching subscriber, no
-  new phantom-fire surface.
+- **Pattern-matching column:** one Dash callback per action type
+  (9) + renderer (1) = **10 in the callback graph**. Every action
+  callback is a pattern-matching subscriber. Adding a new action
+  adds a new pattern callback.
+- **Event-bridge column:** one Dash callback for dispatch
+  (1) + renderer (1) = **2 in the callback graph**. Per-action logic
+  lives as 9 reducers registered on the dispatch callback's action
+  registry (`@events.handle("action")`). Adding a new action is a
+  new reducer — not a new Dash callback, not a new pattern-matching
+  subscriber, no new phantom-fire surface.
 
 The callback *graph* is what carries cost. Reducers are Python dict
 lookups at dispatch time — they don't phantom-fire, don't subscribe
 to layout, don't compete for `allow_duplicate` writes.
 
-## Why the gap exists
+## Where the contrast comes from
 
 ### 1. Pattern-matching Inputs subscribe to layout
 
@@ -69,30 +76,32 @@ pattern sets at once. Even with the canonical guard
 no_update`), the server still does the round-trip to return
 `no_update` — and ships the full State store with it.
 
-### 2. Payload threads awkwardly through pattern IDs
+### 2. Payload threads through pattern IDs
 
-`panel.add` wants a `kind`. In pure Dash, the idiomatic fix is to put
-the kind in the pattern ID: `{"type": "panel-add", "kind": ALL}`. That
-works, but multi-parameter actions (e.g. `panel.badge.cycle` needing
-panel_id + badge_index) leak more data into the ID dict. With Dash
-Relay, the JSON `payload` field carries whatever shape you want.
+`panel.add` wants a `kind`. The idiomatic approach is to put the kind
+in the pattern ID: `{"type": "panel-add", "kind": ALL}`. That works,
+but multi-parameter actions (e.g. `panel.badge.cycle` needing
+panel_id + badge_index) mean more fields in the ID dict. The event
+bridge gives you a separate JSON `payload` field, which carries
+whatever shape you want without widening the ID.
 
 ### 3. Multiple writers to one store
 
-Every pure-Dash action callback writes to `canvas.data` with
-`allow_duplicate=True`. Ten writers against one store work, but any
-invariant you want to maintain (e.g. undo, optimistic updates) has to
-account for all ten writers. Dash Relay has one writer — the dispatch
-callback — so invariants live in one place.
+Every action callback in the pattern-matching column writes to
+`canvas.data` with `allow_duplicate=True`. Ten writers against one
+store work fine, but any invariant you want to maintain (e.g. undo,
+optimistic updates) has to account for all ten writers. The
+event-bridge column has one writer — the dispatch callback — so
+invariants live in one place.
 
-## What Dash Relay wins (and what it doesn't claim)
+## What the event bridge buys you (and what it doesn't claim)
 
 ### Directly measured in this demo
 
 - **Faster** — ~63% less wall-clock time from click to last response.
 - **Less network traffic** — ~84% fewer bytes over the wire, because
-  every pure-Dash phantom round-trip ships the full State store just
-  to return `no_update`.
+  every phantom round-trip on the pattern-matching side ships the
+  full State store just to return `no_update`.
 - **Less wiring code** — 108 lines vs 31 lines (71% less) for the
   plumbing between UI and mutation helpers. The mutation helpers
   themselves (`do_folder_add`, `do_panel_duplicate`, …) are identical
@@ -104,18 +113,18 @@ callback — so invariants live in one place.
 ### Inferred but not measured
 
 - **Memory / allocation pressure** is almost certainly lower on the
-  Dash Relay side — each pure-Dash phantom round-trip allocates a
-  full State copy only to return `no_update`, so the per-click
-  allocation count is ~5× higher. The bytes-over-wire number is a
-  decent proxy but not proof; we never put the server process on a
-  scale.
+  event-bridge side — each phantom round-trip on the pattern-matching
+  side allocates a full State copy only to return `no_update`, so the
+  per-click allocation count is ~5× higher. The bytes-over-wire
+  number is a decent proxy but not proof; we never put the server
+  process on a scale.
 
 ### Qualitative but real
 
 - **Easier to reason about.** One dispatch callback, one store
   writer, one place where invariants live.
-- **Harder to fuck up.** The pure-Dash footguns Dash Relay doesn't
-  make you remember include:
+- **Fewer details to remember.** The pattern-matching approach asks
+  the author to remember:
     - `if not ctx.triggered_id or ctx.triggered[0]["value"] is None:
       return no_update` — the canonical guard for ALL-pattern
       callbacks. The weaker `if not ctx.triggered_id` variant
@@ -126,11 +135,12 @@ callback — so invariants live in one place.
       stores.
     - Payload threading through pattern ID dicts for
       multi-parameter actions.
-    - Phantom-fire discipline every time you add a new pattern
-      callback.
+    - Re-checking phantom-fire behavior every time a new pattern
+      callback is added.
 
-Dash Relay reducers are just `@events.handle("name") def _(s, payload,
-event): ...` with no defensive boilerplate. None of the above applies.
+Event-bridge reducers are just `@events.handle("name") def _(s,
+payload, event): ...` with no defensive boilerplate. None of the
+above applies.
 
 ## What Dash Relay trades away
 
@@ -140,6 +150,7 @@ rather than the standard Dash callback graph, so tools that introspect
 that graph (e.g. the dev panel's callback view) show only the single
 dispatch callback, not per-action handlers.
 
-If your app is a static layout with a fixed number of interactions,
-plain Dash is simpler. Dash Relay earns its keep when the layout is
-dynamic, entities nest, and the number of action types is growing.
+For a static layout with a fixed number of interactions, pattern
+matching is lighter-weight. The event bridge earns its keep when the
+layout is dynamic, entities nest, and the number of action types is
+growing.

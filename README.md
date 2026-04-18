@@ -7,16 +7,19 @@ callback per interactive element.
 
 ## Why it exists
 
-Dash is great when your layout is mostly static. It gets awkward once
-parts of the UI are rebuilt at runtime, when the same interaction pattern
-repeats in many places, or when interactive elements live inside regions
-that come and go.
+For layouts where regions are rebuilt at runtime, the same interaction
+pattern repeats in many places, or interactive elements live inside
+regions that come and go, the amount of callback wiring can grow
+faster than the UI itself — pattern-matching callbacks, canonical
+guards, and `allow_duplicate` coordination across many writers.
 
 Dash Relay moves UI events off the Dash callback graph and onto a
 single client-side bridge. You wrap existing Dash components with one
-call; events flow into a `dcc.Store`; one server-side registry dispatches
-them to reducers by action name. Layouts can be rerendered freely
-without touching the callback graph.
+call; events flow into a `dcc.Store`; one server-side registry
+dispatches them to reducers by action name. Layouts can be rerendered
+freely without touching the callback graph. The pattern-matching
+approach stays cleaner for static layouts; the bridge earns its keep
+once things start moving.
 
 ## The whole surface
 
