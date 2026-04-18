@@ -555,6 +555,22 @@ _CONSOLE_JS = r"""
     scheduleFinalize(side);
   }
 
+  // Queue of deferred DOM work (dot draws, console appends). We defer these
+  // via requestAnimationFrame so instrumentation mutations don't sit inside
+  // the per-row timing window — otherwise the side that does more fetches
+  // pays more DOM cost and the wall-time delta partly measures ourselves.
+  var domQueue = [];
+  var domFlushing = false;
+  function queueDom(fn) {
+    domQueue.push(fn);
+    if (domFlushing) return;
+    domFlushing = true;
+    requestAnimationFrame(function () {
+      var q = domQueue; domQueue = []; domFlushing = false;
+      for (var i = 0; i < q.length; i++) { try { q[i](); } catch (e) {} }
+    });
+  }
+
   function addRoundTrip(side, bytes) {
     var st = tlState[side];
     if (!st.row) {
@@ -563,13 +579,27 @@ _CONSOLE_JS = r"""
       startRow(side, "(init)");
     }
     var row = st.row;
+    // Bytes counter update is cheap and needed for finalizeRow readout;
+    // dot-draw (DOM mutation) is deferred.
     row.dataset.bytes = String(parseInt(row.dataset.bytes || "0", 10) + bytes);
-    tlState[side].lastRtTime = Date.now();
-    var dots = row.querySelector(".tl-dots");
-    var d = document.createElement("span");
-    d.className = "tl-rt-dot";
-    d.title = "server round-trip · " + fmtBytes(bytes);
-    dots.appendChild(d);
+    queueDom(function () {
+      var dots = row.querySelector(".tl-dots");
+      if (!dots) return;
+      var d = document.createElement("span");
+      d.className = "tl-rt-dot";
+      d.title = "server round-trip · " + fmtBytes(bytes);
+      dots.appendChild(d);
+    });
+    scheduleFinalize(side);
+  }
+
+  // Called when a tracked fetch *resolves* (response received), not when
+  // it's initiated. This is what makes the per-row duration reflect
+  // click → last-response-received rather than click → last-request-sent.
+  function markResponseReceived(side) {
+    var st = tlState[side];
+    if (!st) return;
+    st.lastRtTime = Date.now();
     scheduleFinalize(side);
   }
 
@@ -622,13 +652,21 @@ _CONSOLE_JS = r"""
                   String(t.getSeconds()).padStart(2, "0") + "." +
                   String(t.getMilliseconds()).padStart(3, "0");
       var label = (out || "?").split("@")[0];
-      appendRaw(side, stamp + "  " + label + "  (" + fmtBytes(bytes) + ")  <-  " + shortTrig(trig));
+      var line = stamp + "  " + label + "  (" + fmtBytes(bytes) + ")  <-  " + shortTrig(trig);
+      // Console line is a DOM mutation — defer it so the side with more
+      // fetches doesn't pay more layout cost inside the timing window.
+      queueDom(function () { appendRaw(side, line); });
       addRoundTrip(side, bytes);
       totals[side].trips += 1;
       totals[side].bytes += bytes;
       refreshSummary(side);
     }
-    return origFetch.apply(this, args);
+    var p = origFetch.apply(this, args);
+    if (side) {
+      p.then(function () { markResponseReceived(side); },
+             function () { markResponseReceived(side); });
+    }
+    return p;
   };
 
   // ---- Test runner ----

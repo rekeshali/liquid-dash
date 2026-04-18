@@ -205,10 +205,13 @@ python examples/live_test/app.py
 # (verified by test_workspace_demo_has_small_fixed_callback_graph).
 python examples/workspace_demo/app.py
 
-# Head-to-head: same 9-action surface built two ways. In-page timelines
-# show every _dash-update-component fire attributed to each side; the
-# top-right compare panel aggregates percent differences across runs
-# (~80% fewer round-trips, ~84% less data, ~63% faster wall time).
+# Head-to-head: same 9-action nested surface built two ways. In-page
+# timelines show every _dash-update-component fire attributed to each
+# side; the top-right compare panel aggregates percent differences
+# across runs (~80% fewer round-trips, ~83% less data over the wire,
+# ~40% less time from click to last server response, i.e.
+# server-round-trip time — client-render time is not counted).
+# Measured on an Apple M1 Pro.
 python examples/pattern_matching_vs_event_bridge/nested_side_by_side.py
 ```
 
