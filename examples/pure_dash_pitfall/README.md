@@ -1,4 +1,4 @@
-# Pure Dash vs Liquid Dash
+# Pure Dash vs Dash Relay
 
 Nested workspace surface — Folders → Tabs → Panels with 9 action types
 across 3 entity levels — implemented two ways in one Dash app. Each
@@ -20,22 +20,22 @@ Tests run: N    Round-trips: N    Total: N KB    Total time: N s
 A fixed **Head-to-head** panel in the top-right corner has a
 **▶ Run both tests** button that fires both columns in parallel and
 aggregates the per-run deltas into percent-difference cards
-(`80% fewer round-trips (LD)`, `84% less data (LD)`,
-`63% faster (LD)`). The aggregate accumulates across every
-Run-both click so the raw before → after numbers grow with use.
+(`80% fewer round-trips`, `84% less data`, `63% faster`). The aggregate
+accumulates across every Run-both click so the raw before → after
+numbers grow with use.
 
 ## Measured contrast (one test run = 9 clicks)
 
 | | callback graph | round-trips | bytes | wall time (click → last response) |
 |---|---|---|---|---|
 | Pure Dash column | 10 callbacks | ~88 | ~108 KB | ~1.7 s |
-| Liquid Dash column | 2 callbacks + 9 reducers | ~18 | ~18 KB | ~0.6 s |
-| Liquid Dash win | ~80% smaller graph | ~80% fewer | ~84% less | ~63% faster |
+| Dash Relay column | 2 callbacks + 9 reducers | ~18 | ~18 KB | ~0.6 s |
+| Dash Relay win | ~80% smaller graph | ~80% fewer | ~84% less | ~63% faster |
 
 Percentages are stable across runs (both columns scale proportionally).
 Absolute numbers grow per run because each click operates on more
 state — which is exactly where Pure Dash's per-trip payload cost
-scales linearly and Liquid Dash's doesn't.
+scales linearly and Dash Relay's doesn't.
 
 ### What "2 callbacks + 9 reducers" means
 
@@ -46,12 +46,12 @@ whether those actions are first-class Dash callbacks.
   **10 in the callback graph**. Every action callback is a
   pattern-matching subscriber. Adding a new action adds a new pattern
   callback.
-- **Liquid Dash:** one Dash callback for dispatch (1) + renderer (1) =
+- **Dash Relay:** one Dash callback for dispatch (1) + renderer (1) =
   **2 in the callback graph**. Per-action logic lives as 9 reducers
   registered on the dispatch callback's action registry
-  (`@events.on("action")`). Adding a new action is a new reducer — not
-  a new Dash callback, not a new pattern-matching subscriber, no new
-  phantom-fire surface.
+  (`@events.handle("action")`). Adding a new action is a new reducer —
+  not a new Dash callback, not a new pattern-matching subscriber, no
+  new phantom-fire surface.
 
 The callback *graph* is what carries cost. Reducers are Python dict
 lookups at dispatch time — they don't phantom-fire, don't subscribe
@@ -74,18 +74,18 @@ no_update`), the server still does the round-trip to return
 `panel.add` wants a `kind`. In pure Dash, the idiomatic fix is to put
 the kind in the pattern ID: `{"type": "panel-add", "kind": ALL}`. That
 works, but multi-parameter actions (e.g. `panel.badge.cycle` needing
-panel_id + badge_index) leak more data into the ID dict. With Liquid
-Dash, the JSON `payload` field carries whatever shape you want.
+panel_id + badge_index) leak more data into the ID dict. With Dash
+Relay, the JSON `payload` field carries whatever shape you want.
 
 ### 3. Multiple writers to one store
 
 Every pure-Dash action callback writes to `canvas.data` with
 `allow_duplicate=True`. Ten writers against one store work, but any
 invariant you want to maintain (e.g. undo, optimistic updates) has to
-account for all ten writers. Liquid Dash has one writer — the
-dispatch callback — so invariants live in one place.
+account for all ten writers. Dash Relay has one writer — the dispatch
+callback — so invariants live in one place.
 
-## What Liquid Dash wins (and what it doesn't claim)
+## What Dash Relay wins (and what it doesn't claim)
 
 ### Directly measured in this demo
 
@@ -104,7 +104,7 @@ dispatch callback — so invariants live in one place.
 ### Inferred but not measured
 
 - **Memory / allocation pressure** is almost certainly lower on the
-  Liquid Dash side — each pure-Dash phantom round-trip allocates a
+  Dash Relay side — each pure-Dash phantom round-trip allocates a
   full State copy only to return `no_update`, so the per-click
   allocation count is ~5× higher. The bytes-over-wire number is a
   decent proxy but not proof; we never put the server process on a
@@ -114,7 +114,7 @@ dispatch callback — so invariants live in one place.
 
 - **Easier to reason about.** One dispatch callback, one store
   writer, one place where invariants live.
-- **Harder to fuck up.** The pure-Dash footguns Liquid Dash doesn't
+- **Harder to fuck up.** The pure-Dash footguns Dash Relay doesn't
   make you remember include:
     - `if not ctx.triggered_id or ctx.triggered[0]["value"] is None:
       return no_update` — the canonical guard for ALL-pattern
@@ -129,17 +129,17 @@ dispatch callback — so invariants live in one place.
     - Phantom-fire discipline every time you add a new pattern
       callback.
 
-Liquid Dash reducers are just `@events.on("name") def _(s, payload,
+Dash Relay reducers are just `@events.handle("name") def _(s, payload,
 event): ...` with no defensive boilerplate. None of the above applies.
 
-## What Liquid Dash trades away
+## What Dash Relay trades away
 
-Liquid Dash adds a client-side script (~120 lines) and one wrapper
+Dash Relay adds a client-side script (~120 lines) and one wrapper
 `html.Div` per interactive element. Events flow through `dcc.Store`
 rather than the standard Dash callback graph, so tools that introspect
 that graph (e.g. the dev panel's callback view) show only the single
 dispatch callback, not per-action handlers.
 
 If your app is a static layout with a fixed number of interactions,
-plain Dash is simpler. Liquid Dash earns its keep when the layout is
+plain Dash is simpler. Dash Relay earns its keep when the layout is
 dynamic, entities nest, and the number of action types is growing.

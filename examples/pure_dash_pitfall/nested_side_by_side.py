@@ -16,7 +16,7 @@ Click around in either column and compare:
   - callbacks registered (shown in each column header)
   - round-trips per click (shown in each column's console)
   - the code size needed to wire 9 actions (grep the Pure Dash section
-    vs the Liquid Dash section of this file).
+    vs the Dash Relay section of this file).
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-import liquid_dash as ld
+import dash_relay as relay
 
 
 # ---------------------------------------------------------------------------
@@ -296,28 +296,28 @@ def _render_ld_column(state):
     for f in state["folders"]:
         style = {**_CARD, **(_ACTIVE if f["id"] == active_fid else {})}
         folder_tiles.append(html.Div([
-            ld.on(
+            relay.emitter(
                 html.Button(f["name"], style={"border": "none", "background": "none",
                                               "cursor": "pointer", "padding": "0", "fontSize": "13px"}),
-                "folder.activate", target=f["id"], to="ld-bridge",
+                "folder.activate", target=f["id"], to="relay-bridge",
             ),
-            ld.on(html.Button("×", style=_BTN), "folder.delete", target=f["id"], to="ld-bridge"),
+            relay.emitter(html.Button("×", style=_BTN), "folder.delete", target=f["id"], to="relay-bridge"),
         ], style=style))
-    folder_tiles.append(ld.on(html.Button("+ Folder", style=_BTN), "folder.add", to="ld-bridge"))
+    folder_tiles.append(relay.emitter(html.Button("+ Folder", style=_BTN), "folder.add", to="relay-bridge"))
 
     tab_tiles = []
     if folder:
         for t in folder["tabs"]:
             style = {**_CARD, **(_ACTIVE if tab and t["id"] == tab["id"] else {})}
             tab_tiles.append(html.Div([
-                ld.on(
+                relay.emitter(
                     html.Button(t["name"], style={"border": "none", "background": "none",
                                                   "cursor": "pointer", "padding": "0", "fontSize": "13px"}),
-                    "tab.activate", target=t["id"], to="ld-bridge",
+                    "tab.activate", target=t["id"], to="relay-bridge",
                 ),
-                ld.on(html.Button("×", style=_BTN), "tab.delete", target=t["id"], to="ld-bridge"),
+                relay.emitter(html.Button("×", style=_BTN), "tab.delete", target=t["id"], to="relay-bridge"),
             ], style=style))
-        tab_tiles.append(ld.on(html.Button("+ Tab", style=_BTN), "tab.add", to="ld-bridge"))
+        tab_tiles.append(relay.emitter(html.Button("+ Tab", style=_BTN), "tab.add", to="relay-bridge"))
 
     panel_cards = []
     if tab:
@@ -326,13 +326,13 @@ def _render_ld_column(state):
                 html.Div(p["name"], style={"fontWeight": "600", "fontSize": "13px"}),
                 html.Span(p["kind"], style=_KIND_BADGE),
                 html.Div([
-                    ld.on(html.Button("dup", style=_BTN), "panel.duplicate", target=p["id"], to="ld-bridge"),
-                    ld.on(html.Button("×", style=_BTN), "panel.delete", target=p["id"], to="ld-bridge"),
+                    relay.emitter(html.Button("dup", style=_BTN), "panel.duplicate", target=p["id"], to="relay-bridge"),
+                    relay.emitter(html.Button("×", style=_BTN), "panel.delete", target=p["id"], to="relay-bridge"),
                 ], style={"display": "flex", "gap": "4px", "marginTop": "auto"}),
             ], style=_PANEL_CARD))
 
     add_panel_buttons = html.Div([
-        ld.on(html.Button(f"+ {k}", style=_BTN), "panel.add", payload={"kind": k}, to="ld-bridge")
+        relay.emitter(html.Button(f"+ {k}", style=_BTN), "panel.add", payload={"kind": k}, to="relay-bridge")
         for k in KINDS
     ], style={"display": "flex", "gap": "6px", "marginTop": "10px"})
 
@@ -452,12 +452,12 @@ _CONSOLE_JS = r"""
   if (window.__nestedSbsInstalled) return;
   window.__nestedSbsInstalled = true;
   var origFetch = window.fetch;
-  var tlState = { pd: {row: null, start: 0, timer: null}, ld: {row: null, start: 0, timer: null} };
+  var tlState = { pd: {row: null, start: 0, timer: null}, relay: {row: null, start: 0, timer: null} };
 
   function sideOf(out) {
     if (typeof out !== "string") return null;
     if (out.indexOf("pd-") === 0) return "pd";
-    if (out.indexOf("ld-") === 0) return "ld";
+    if (out.indexOf("relay-") === 0) return "relay";
     return null;
   }
 
@@ -465,7 +465,7 @@ _CONSOLE_JS = r"""
     var node = el;
     while (node && node.nodeType === 1) {
       if (node.id === "pd-root") return "pd";
-      if (node.id === "ld-root") return "ld";
+      if (node.id === "relay-root") return "relay";
       node = node.parentElement;
     }
     return null;
@@ -581,7 +581,7 @@ _CONSOLE_JS = r"""
   // Running totals per side
   var totals = {
     pd: { runs: 0, trips: 0, bytes: 0, time_ms: 0 },
-    ld: { runs: 0, trips: 0, bytes: 0, time_ms: 0 },
+    relay: { runs: 0, trips: 0, bytes: 0, time_ms: 0 },
   };
   function fmtTime(ms) {
     if (ms < 1000) return ms + " ms";
@@ -696,7 +696,7 @@ _CONSOLE_JS = r"""
   function snapTotals() {
     return {
       pd: { trips: totals.pd.trips, bytes: totals.pd.bytes, time_ms: totals.pd.time_ms },
-      ld: { trips: totals.ld.trips, bytes: totals.ld.bytes, time_ms: totals.ld.time_ms },
+      relay: { trips: totals.relay.trips, bytes: totals.relay.bytes, time_ms: totals.relay.time_ms },
     };
   }
 
@@ -710,13 +710,13 @@ _CONSOLE_JS = r"""
   var cmpAggregate = {
     runs: 0,
     pd: { trips: 0, bytes: 0, time_ms: 0 },
-    ld: { trips: 0, bytes: 0, time_ms: 0 },
+    relay: { trips: 0, bytes: 0, time_ms: 0 },
   };
 
-  // Returns percent reduction from pd to ld. Positive = LD smaller.
-  function pctReduction(pd, ld) {
-    if (pd === 0) return ld === 0 ? 0 : -Infinity;
-    return Math.round(((pd - ld) / pd) * 100);
+  // Returns percent reduction from pd to relay. Positive = relay smaller.
+  function pctReduction(pd, relay) {
+    if (pd === 0) return relay === 0 ? 0 : -Infinity;
+    return Math.round(((pd - relay) / pd) * 100);
   }
 
   function metricRow(label, pdVal, ldVal, pdFmt, ldFmt, winWord, loseWord) {
@@ -739,13 +739,13 @@ _CONSOLE_JS = r"""
     var runWord = a.runs === 1 ? "run" : "runs";
     el.innerHTML =
       '<div class="cmp-runs">Aggregated over ' + a.runs + ' ' + runWord + '</div>' +
-      metricRow("Round-trips", a.pd.trips, a.ld.trips,
-                a.pd.trips, a.ld.trips, "fewer", "more") +
-      metricRow("Data sent", a.pd.bytes, a.ld.bytes,
-                fmtBytes(a.pd.bytes), fmtBytes(a.ld.bytes),
+      metricRow("Round-trips", a.pd.trips, a.relay.trips,
+                a.pd.trips, a.relay.trips, "fewer", "more") +
+      metricRow("Data sent", a.pd.bytes, a.relay.bytes,
+                fmtBytes(a.pd.bytes), fmtBytes(a.relay.bytes),
                 "less", "more") +
-      metricRow("Wall time", a.pd.time_ms, a.ld.time_ms,
-                fmtTime(a.pd.time_ms), fmtTime(a.ld.time_ms),
+      metricRow("Wall time", a.pd.time_ms, a.relay.time_ms,
+                fmtTime(a.pd.time_ms), fmtTime(a.relay.time_ms),
                 "faster", "slower");
   }
 
@@ -753,17 +753,17 @@ _CONSOLE_JS = r"""
     var cmpBtn = document.getElementById("cmp-runbtn");
     if (cmpBtn) cmpBtn.disabled = true;
     var before = snapTotals();
-    await Promise.all([runTest("pd"), runTest("ld")]);
+    await Promise.all([runTest("pd"), runTest("relay")]);
     var after = snapTotals();
     var pdDelta = diff(after.pd, before.pd);
-    var ldDelta = diff(after.ld, before.ld);
+    var relayDelta = diff(after.relay, before.relay);
     cmpAggregate.runs += 1;
     cmpAggregate.pd.trips += pdDelta.trips;
     cmpAggregate.pd.bytes += pdDelta.bytes;
     cmpAggregate.pd.time_ms += pdDelta.time_ms;
-    cmpAggregate.ld.trips += ldDelta.trips;
-    cmpAggregate.ld.bytes += ldDelta.bytes;
-    cmpAggregate.ld.time_ms += ldDelta.time_ms;
+    cmpAggregate.relay.trips += relayDelta.trips;
+    cmpAggregate.relay.bytes += relayDelta.bytes;
+    cmpAggregate.relay.time_ms += relayDelta.time_ms;
     renderCompareAggregate();
     if (cmpBtn) cmpBtn.disabled = false;
   }
@@ -772,14 +772,14 @@ _CONSOLE_JS = r"""
   var wireTries = 0;
   function tryWire() {
     var pdBtn = document.getElementById("pd-runbtn");
-    var ldBtn = document.getElementById("ld-runbtn");
+    var relayBtn = document.getElementById("relay-runbtn");
     var cmpBtn = document.getElementById("cmp-runbtn");
-    if (pdBtn && ldBtn && cmpBtn) {
+    if (pdBtn && relayBtn && cmpBtn) {
       pdBtn.addEventListener("click", function () { runTest("pd"); });
-      ldBtn.addEventListener("click", function () { runTest("ld"); });
+      relayBtn.addEventListener("click", function () { runTest("relay"); });
       cmpBtn.addEventListener("click", function () { runBothTests(); });
       refreshSummary("pd");
-      refreshSummary("ld");
+      refreshSummary("relay");
       return;
     }
     wireTries += 1;
@@ -792,7 +792,7 @@ _CONSOLE_JS = r"""
 
 
 app = Dash(__name__, suppress_callback_exceptions=True)
-ld.melt(app)
+relay.install(app)
 app.index_string = app.index_string.replace("<head>", "<head>" + _CONSOLE_JS, 1)
 
 
@@ -943,70 +943,70 @@ def pd_panel_duplicate(_clicks, s):
 
 
 # ---------------------------------------------------------------------------
-# Liquid Dash column
+# Dash Relay column
 #
-# One bridge. One dispatch callback (registered by ld.handler). One renderer.
+# One bridge. One dispatch callback (registered by relay.registry). One renderer.
 # Nine handlers registered against the bridge, each just calls the shared
 # do_* helper. The callback graph is the same whether we have 9 actions or
 # 90.
 # ---------------------------------------------------------------------------
-# >>> LD-ACTIONS-BEGIN
+# >>> RELAY-ACTIONS-BEGIN
 
 
-events = ld.handler(app, state="ld-state", bridge="ld-bridge")
+events = relay.registry(app, state="relay-state", bridge="relay-bridge")
 
 
-@events.on("folder.add")
+@events.handle("folder.add")
 def _(s, payload, event):
     do_folder_add(s)
 
 
-@events.on("folder.activate")
+@events.handle("folder.activate")
 def _(s, payload, event):
     do_folder_activate(s, event["target"])
 
 
-@events.on("folder.delete")
+@events.handle("folder.delete")
 def _(s, payload, event):
     do_folder_delete(s, event["target"])
 
 
-@events.on("tab.add")
+@events.handle("tab.add")
 def _(s, payload, event):
     do_tab_add(s)
 
 
-@events.on("tab.activate")
+@events.handle("tab.activate")
 def _(s, payload, event):
     do_tab_activate(s, event["target"])
 
 
-@events.on("tab.delete")
+@events.handle("tab.delete")
 def _(s, payload, event):
     do_tab_delete(s, event["target"])
 
 
-@events.on("panel.add")
+@events.handle("panel.add")
 def _(s, payload, event):
     do_panel_add(s, (payload or {}).get("kind", "timeseries"))
 
 
-@events.on("panel.delete")
+@events.handle("panel.delete")
 def _(s, payload, event):
     do_panel_delete(s, event["target"])
 
 
-@events.on("panel.duplicate")
+@events.handle("panel.duplicate")
 def _(s, payload, event):
     do_panel_duplicate(s, event["target"])
 
 
-@app.callback(Output("ld-root", "children"), Input("ld-state", "data"))
+@app.callback(Output("relay-root", "children"), Input("relay-state", "data"))
 def ld_render(state):
     return _render_ld_column(state)
 
 
-# <<< LD-ACTIONS-END
+# <<< RELAY-ACTIONS-END
 
 
 # ---------------------------------------------------------------------------
@@ -1071,14 +1071,14 @@ def _count_source_lines(begin_marker, end_marker):
 
 
 _PD_CB_COUNT = _count_callbacks("pd-")
-_LD_CB_COUNT = _count_callbacks("ld-")
-# Liquid Dash also has per-action reducers registered via @events.on(...).
+_RELAY_CB_COUNT = _count_callbacks("relay-")
+# Dash Relay also has per-action reducers registered via @events.handle(...).
 # They're not in the Dash callback graph (one Dash dispatch callback routes
 # to all of them by action name), so they don't inflate phantom-fire cost
 # the way pattern-matching callbacks do. But they're still code we wrote.
-_LD_REDUCER_COUNT = len(events._handlers)
+_RELAY_REDUCER_COUNT = len(events._handlers)
 _PD_LINES = _count_source_lines("PD-ACTIONS-BEGIN", "PD-ACTIONS-END")
-_LD_LINES = _count_source_lines("LD-ACTIONS-BEGIN", "LD-ACTIONS-END")
+_RELAY_LINES = _count_source_lines("RELAY-ACTIONS-BEGIN", "RELAY-ACTIONS-END")
 
 
 def _column(title, badges, root_id, timeline_id, console_id, summary_id, runbtn_id):
@@ -1138,7 +1138,7 @@ _compare_panel = html.Div(
 app.layout = html.Div([
     _compare_panel,
     html.H1(
-        "Dynamically Generated Nested Components: Pure Dash vs. Liquid Dash",
+        "Dynamically Generated Nested Components: Pure Dash vs. Dash Relay",
         style={"marginBottom": "4px"},
     ),
     html.P(
@@ -1148,8 +1148,8 @@ app.layout = html.Div([
         style={"color": "#555", "marginTop": 0, "marginBottom": "20px"},
     ),
     dcc.Store(id="pd-state", data=initial_state()),
-    dcc.Store(id="ld-state", data=initial_state()),
-    ld.bridge("ld-bridge"),
+    dcc.Store(id="relay-state", data=initial_state()),
+    relay.bridge("relay-bridge"),
     html.Div([
         _column(
             "Pure Dash",
@@ -1157,10 +1157,10 @@ app.layout = html.Div([
             "pd-root", "pd-timeline", "pd-console", "pd-summary", "pd-runbtn",
         ),
         _column(
-            "Liquid Dash",
-            [f"{_LD_CB_COUNT} callbacks + {_LD_REDUCER_COUNT} reducers",
-             f"{_LD_LINES} lines of wiring"],
-            "ld-root", "ld-timeline", "ld-console", "ld-summary", "ld-runbtn",
+            "Dash Relay",
+            [f"{_RELAY_CB_COUNT} callbacks + {_RELAY_REDUCER_COUNT} reducers",
+             f"{_RELAY_LINES} lines of wiring"],
+            "relay-root", "relay-timeline", "relay-console", "relay-summary", "relay-runbtn",
         ),
     ], style={"display": "flex", "gap": "20px", "alignItems": "stretch"}),
 ], style={
