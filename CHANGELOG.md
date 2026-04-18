@@ -4,6 +4,51 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-04-18
+
+**Breaking kwarg renames on the public surface.** Normally these would
+force a major-version bump; shipping under 1.1 instead because the
+package is one day old on PyPI with effectively zero adopters and the
+rename-cost-now vs carry-the-inconsistency-forever tradeoff clearly
+favors fixing it now. No aliases, no deprecation warnings — callers
+on 1.0.x must update their code.
+
+### Renamed
+
+| Old | New | Function |
+|---|---|---|
+| `register_asset=` | `register_runtime=` | `install()` |
+| `to=` | `bridge=` | `emitter()` |
+| `event=` | `on=` | `emitter()` |
+
+Also the emitter's DOM data attribute `data-relay-event` renamed to
+`data-relay-on` so the Python-side and DOM-side names stay aligned.
+
+### Why each
+
+- `register_runtime`: `register_asset` only named half of what the
+  flag does (registers the Flask route *and* injects the `<script>`
+  into `index_string`). "register_runtime" names the whole thing.
+- `bridge` on the emitter: every other surface used "bridge" already
+  (the `bridge()` factory, `registry(bridge=)`, the DOM data
+  attribute). The emitter's `to=` was the sole outlier.
+- `on`: mirrors JSX/React (`on="click"`), reads naturally next to the
+  component being wrapped, and avoids the in-code echo with the
+  handler's `event` parameter name (which carries the full event
+  envelope, not the DOM event type).
+
+### Migration
+
+```python
+# before
+relay.install(app, register_asset=False)
+relay.emitter(dcc.Input(...), "draft", event="input", to="analytics")
+
+# after
+relay.install(app, register_runtime=False)
+relay.emitter(dcc.Input(...), "draft", on="input", bridge="analytics")
+```
+
 ## [1.0.1] — 2026-04-18
 
 PyPI polish only — no library code changes.
