@@ -85,7 +85,7 @@ def _(state, payload, event):
 app.layout = html.Div([
     dcc.Store(id="state", data={"draft": "", "items": []}),
     relay.bridge(),
-    relay.emitter(dcc.Input(placeholder="New task..."), "draft", event="input"),
+    relay.emitter(dcc.Input(placeholder="New task..."), "draft", on="input"),
     relay.emitter(html.Button("Add"), "add"),
     html.Ul(id="list"),
 ])
@@ -111,9 +111,9 @@ if __name__ == "__main__":
 ### `relay.install(app)`
 
 Installs a ~130-line client-side script that watches the DOM for
-elements carrying `data-relay-event` attributes and lazily binds
+elements carrying `data-relay-on` attributes and lazily binds
 document-level listeners for whatever event types it finds. The
-runtime is event-agnostic: `event=` accepts any DOM event string —
+runtime is event-agnostic: `on=` accepts any DOM event string —
 including non-bubbling ones like `focus`/`blur` and custom events
 dispatched via `element.dispatchEvent(new CustomEvent(...))`.
 
@@ -136,7 +136,7 @@ the component.
 | kwarg | purpose | default |
 |---|---|---|
 | `payload=` | JSON-serializable value passed to the handler | `None` |
-| `event=` | DOM event name | `"click"` |
+| `on=` | DOM event name | `"click"` |
 | `bridge=` | target bridge id | `"bridge"` |
 | `target=`, `source=` | context values on the event (any JSON-serializable; types round-trip) | `None` |
 | `prevent_default=` | calls `event.preventDefault()` client-side | `False` |

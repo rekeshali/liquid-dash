@@ -16,7 +16,7 @@ def _wrap(
     *,
     action: str,
     payload: Any = None,
-    event: str = "click",
+    on: str = "click",
     bridge: str = DEFAULT_BRIDGE_ID,
     target: Any = None,
     source: Any = None,
@@ -24,8 +24,8 @@ def _wrap(
 ):
     if not isinstance(action, str) or not action.strip():
         raise ValueError("emitter(): action must be a non-empty string")
-    if not isinstance(event, str) or not event.strip():
-        raise ValueError("emitter(): event must be a non-empty string")
+    if not isinstance(on, str) or not on.strip():
+        raise ValueError("emitter(): on must be a non-empty string")
 
     try:
         payload_json = json.dumps(payload)
@@ -36,7 +36,7 @@ def _wrap(
 
     attrs = {
         "data-relay-action": action,
-        "data-relay-event": event,
+        "data-relay-on": on,
         "data-relay-payload": payload_json,
         "data-relay-bridge": bridge or "",
         "data-relay-target": target_json,
@@ -50,7 +50,7 @@ def _wrap(
 def emitter(
     *args,
     payload: Any = None,
-    event: str = "click",
+    on: str = "click",
     bridge: str = DEFAULT_BRIDGE_ID,
     target: Any = None,
     source: Any = None,
@@ -61,9 +61,9 @@ def emitter(
     Two forms:
 
         emitter(component, action, ...) -> wrapped component
-            Wraps `component` so that when the named DOM `event` (default
-            "click") fires on it or any descendant, a payload is written to
-            the target bridge store.
+            Wraps `component` so that when the DOM event named by `on=`
+            (default "click") fires on it or any descendant, a payload
+            is written to the target bridge store.
 
         emitter(action, ...) -> callable
             Returns a reusable emitter factory `f(component, **extra)` that
@@ -71,7 +71,7 @@ def emitter(
             Keyword overrides (e.g. `payload=...`) supplied to `f` override
             those supplied to `emitter()`.
 
-    Any DOM event name works for `event=`. The client-side handler registers
+    Any DOM event name works for `on=`. The client-side handler registers
     listeners in capture phase, lazily, as new event names appear in the
     layout — so non-bubbling events (`focus`, `blur`) and custom events
     dispatched via `element.dispatchEvent(new CustomEvent(...))` work too.
@@ -79,7 +79,7 @@ def emitter(
     """
     kw = {
         "payload": payload,
-        "event": event,
+        "on": on,
         "bridge": bridge,
         "target": target,
         "source": source,
