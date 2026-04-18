@@ -18,7 +18,7 @@ def _read_asset() -> str:
     )
 
 
-def _register_asset(app) -> None:
+def _register_runtime(app) -> None:
     server = app.server
 
     if _ENDPOINT not in server.view_functions:
@@ -37,7 +37,7 @@ def _register_asset(app) -> None:
         )
 
 
-def install(app, *, register_asset: bool = True):
+def install(app, *, register_runtime: bool = True):
     """Prepare a Dash app to carry Dash Relay events.
 
     Two side effects on ``app``:
@@ -51,11 +51,11 @@ def install(app, *, register_asset: bool = True):
 
     Both steps are idempotent — calling ``install()`` twice is safe.
 
-    Pass ``register_asset=False`` to skip both steps, e.g. if you prefer
+    Pass ``register_runtime=False`` to skip both steps, e.g. if you prefer
     to vendor the asset yourself or serve it from a CDN.
 
     Returns the app for chaining.
     """
-    if register_asset:
-        _register_asset(app)
+    if register_runtime:
+        _register_runtime(app)
     return app
