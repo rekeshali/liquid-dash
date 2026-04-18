@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
 ## The pieces
 
-**`relay.install(app)`** — installs a ~120-line client-side script that
+**`relay.install(app)`** — installs a ~130-line client-side script that
 watches the DOM for elements carrying `data-relay-event` attributes and
 lazily binds document-level listeners for whatever DOM events it finds.
 No event whitelist: listeners register in capture phase, so non-bubbling
@@ -155,9 +155,23 @@ pip install dash-relay
 ## Examples
 
 ```bash
-python examples/live_test/app.py       # simple panel playground
-python examples/workspace_demo/app.py  # nested folders/tabs/panels
+# Minimal starting point: one screen of panels with add/delete/retype/badge.
+python examples/live_test/app.py
+
+# Workspace-shaped app: folders → tabs → panels with 18 action types.
+# The callback graph stays at 5 no matter how many entities you add
+# (verified by test_workspace_demo_has_small_fixed_callback_graph).
+python examples/workspace_demo/app.py
+
+# Head-to-head: same 9-action surface built two ways. In-page timelines
+# show every _dash-update-component fire attributed to each side; the
+# top-right compare panel aggregates percent differences across runs
+# (~80% fewer round-trips, ~84% less data, ~63% faster wall time).
+python examples/pattern_matching_vs_event_bridge/nested_side_by_side.py
 ```
+
+See [`examples/pattern_matching_vs_event_bridge/README.md`](examples/pattern_matching_vs_event_bridge/README.md)
+for a deeper write-up of what the comparison demo measures and why.
 
 ## Development
 
@@ -176,11 +190,13 @@ browser-binary footprint:
 ```bash
 pip install -e .[integration]
 playwright install chromium
-pytest tests/test_event_types.py -v     # 15 browser-driven tests
+pytest                                    # 44 tests total (29 unit + 15 browser)
+# or just the browser tests:
+pytest tests/test_event_types.py -v
 ```
 
-The file auto-skips if `playwright` isn't installed, so the default
-`pytest` run stays lightweight.
+`tests/test_event_types.py` auto-skips if `playwright` isn't installed,
+so the default `pytest` run stays lightweight.
 
 ## License
 
