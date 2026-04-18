@@ -249,7 +249,7 @@ for a deeper write-up of what the comparison demo measures and why.
 
 ```bash
 pip install -e .[dev]
-pytest                                    # 29 unit tests
+pytest                                    # 35 unit tests
 ```
 
 ### Integration tests (real browser)
@@ -262,13 +262,23 @@ browser-binary footprint:
 ```bash
 pip install -e .[integration]
 playwright install chromium
-pytest                                    # 44 tests total (29 unit + 15 browser)
+pytest                                    # 50 tests total (35 unit + 15 browser)
 # or just the browser tests:
 pytest tests/test_event_types.py -v
 ```
 
 `tests/test_event_types.py` auto-skips if `playwright` isn't installed,
 so the default `pytest` run stays lightweight.
+
+### Scripts
+
+`scripts/record_comparison_demo.py` regenerates the head-to-head GIF
+used in the example's README. Requires `ffmpeg` on `$PATH` and the
+`[integration]` extras for Playwright.
+
+```bash
+python scripts/record_comparison_demo.py
+```
 
 ## License
 
