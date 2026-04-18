@@ -16,7 +16,7 @@ guards, and `allow_duplicate` coordination across many writers.
 Dash Relay moves UI events off the Dash callback graph and onto a
 single client-side bridge. You wrap existing Dash components with one
 call; events flow into a `dcc.Store`; one server-side registry
-dispatches them to reducers by action name. Layouts can be rerendered
+dispatches them to handlers by action name. Layouts can be rerendered
 freely without touching the callback graph. The pattern-matching
 approach stays cleaner for static layouts; the bridge earns its keep
 once things start moving.
@@ -29,7 +29,7 @@ import dash_relay as relay
 relay.install(app)                      # install the client-side runtime once
 relay.bridge()                          # a dcc.Store sink (put it in the layout)
 relay.emitter(component, action, ...)   # wrap a component as an event emitter
-relay.registry(app, state="...")        # registry for server-side reducers
+relay.registry(app, state="...")        # registry for server-side handlers
 relay.validate(layout)                  # optional linter
 ```
 
@@ -123,7 +123,7 @@ delete = relay.emitter("delete")
 
 **`relay.registry(app, state="store_id")`** — registers one internal
 Dash callback wired from the bridge to the state store. Register
-per-action reducers with `@events.handle("action")`. Reducers have
+per-action handlers with `@events.handle("action")`. Handlers have
 signature `(state, payload, event) -> new_state | None`:
 
 - `state` — a deep copy of the state store (safe to mutate)

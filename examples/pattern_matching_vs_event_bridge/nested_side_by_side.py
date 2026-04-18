@@ -8,7 +8,7 @@ cost of each pattern is directly comparable.
   guard (`if not ctx.triggered_id or ctx.triggered[0]["value"] is None`)
   so phantom fires from remounted subscribers return no_update cleanly.
   Idiomatic modern Dash.
-- Right column: the Dash Relay event bridge with per-action reducers
+- Right column: the Dash Relay event bridge with per-action handlers
   registered on a single dispatch callback.
 
 Both columns implement the same surface and call the same state-mutation
@@ -1077,11 +1077,11 @@ def _count_source_lines(begin_marker, end_marker):
 
 _PD_CB_COUNT = _count_callbacks("pd-")
 _RELAY_CB_COUNT = _count_callbacks("relay-")
-# Dash Relay also has per-action reducers registered via @events.handle(...).
+# Dash Relay also has per-action handlers registered via @events.handle(...).
 # They're not in the Dash callback graph (one Dash dispatch callback routes
 # to all of them by action name), so they don't inflate phantom-fire cost
 # the way pattern-matching callbacks do. But they're still code we wrote.
-_RELAY_REDUCER_COUNT = len(events._handlers)
+_RELAY_HANDLER_COUNT = len(events._handlers)
 _PD_LINES = _count_source_lines("PD-ACTIONS-BEGIN", "PD-ACTIONS-END")
 _RELAY_LINES = _count_source_lines("RELAY-ACTIONS-BEGIN", "RELAY-ACTIONS-END")
 
@@ -1163,7 +1163,7 @@ app.layout = html.Div([
         ),
         _column(
             "Dash Relay",
-            [f"{_RELAY_CB_COUNT} callbacks + {_RELAY_REDUCER_COUNT} reducers",
+            [f"{_RELAY_CB_COUNT} callbacks + {_RELAY_HANDLER_COUNT} handlers",
              f"{_RELAY_LINES} lines of wiring"],
             "relay-root", "relay-timeline", "relay-console", "relay-summary", "relay-runbtn",
         ),

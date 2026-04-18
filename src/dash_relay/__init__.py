@@ -1,4 +1,4 @@
-"""Dash Relay — client-side event bridge for Dash with a reducer-style registry.
+"""Dash Relay — client-side event bridge for Dash with a per-action handler registry.
 
 Canonical import:
 

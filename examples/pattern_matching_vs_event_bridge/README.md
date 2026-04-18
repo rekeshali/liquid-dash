@@ -10,7 +10,7 @@ the UI and those helpers differs.
   subscribers return `no_update` cleanly. This is idiomatic modern
   Dash.
 - **Right column: the Dash Relay event bridge** with per-action
-  reducers registered on a single dispatch callback.
+  handlers registered on a single dispatch callback.
 
 ```bash
 python examples/pattern_matching_vs_event_bridge/nested_side_by_side.py
@@ -36,7 +36,7 @@ numbers grow with use.
 | | callback graph | round-trips | bytes | wall time (click → last response) |
 |---|---|---|---|---|
 | Pattern-matching column | 10 callbacks | ~88 | ~108 KB | ~1.7 s |
-| Event-bridge column | 2 callbacks + 9 reducers | ~18 | ~18 KB | ~0.6 s |
+| Event-bridge column | 2 callbacks + 9 handlers | ~18 | ~18 KB | ~0.6 s |
 | Event-bridge delta | ~80% smaller graph | ~80% fewer | ~84% less | ~63% faster |
 
 Percentages are stable across runs (both columns scale proportionally).
@@ -44,7 +44,7 @@ Absolute numbers grow per run because each click operates on more
 state — which is exactly where the pattern-matching column's per-trip
 payload cost scales linearly and the event-bridge column's doesn't.
 
-### What "2 callbacks + 9 reducers" means
+### What "2 callbacks + 9 handlers" means
 
 Both sides have the same number of *actions* (9). The difference is
 whether those actions are first-class Dash callbacks.
@@ -55,12 +55,12 @@ whether those actions are first-class Dash callbacks.
   adds a new pattern callback.
 - **Event-bridge column:** one Dash callback for dispatch
   (1) + renderer (1) = **2 in the callback graph**. Per-action logic
-  lives as 9 reducers registered on the dispatch callback's action
+  lives as 9 handlers registered on the dispatch callback's action
   registry (`@events.handle("action")`). Adding a new action is a
-  new reducer — not a new Dash callback, not a new pattern-matching
+  new handler — not a new Dash callback, not a new pattern-matching
   subscriber, no new phantom-fire surface.
 
-The callback *graph* is what carries cost. Reducers are Python dict
+The callback *graph* is what carries cost. Handlers are Python dict
 lookups at dispatch time — they don't phantom-fire, don't subscribe
 to layout, don't compete for `allow_duplicate` writes.
 
@@ -106,8 +106,8 @@ invariants live in one place.
   plumbing between UI and mutation helpers. The mutation helpers
   themselves (`do_folder_add`, `do_panel_duplicate`, …) are identical
   on both sides — the savings are all in the plumbing.
-- **Smaller callback graph** — 10 Dash callbacks vs 2 + 9 reducers.
-  Reducers aren't Dash primitives, so they don't carry pattern
+- **Smaller callback graph** — 10 Dash callbacks vs 2 + 9 handlers.
+  Handlers aren't Dash primitives, so they don't carry pattern
   subscription, phantom-fire, or `allow_duplicate` overhead.
 
 ### Inferred but not measured
@@ -138,7 +138,7 @@ invariants live in one place.
     - Re-checking phantom-fire behavior every time a new pattern
       callback is added.
 
-Event-bridge reducers are just `@events.handle("name") def _(s,
+Event-bridge handlers are just `@events.handle("name") def _(s,
 payload, event): ...` with no defensive boilerplate. None of the
 above applies.
 
