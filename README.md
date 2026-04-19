@@ -1,5 +1,9 @@
 # Dash Relay
 
+[![PyPI version](https://img.shields.io/pypi/v/dash-relay.svg)](https://pypi.org/project/dash-relay/)
+[![Python versions](https://img.shields.io/pypi/pyversions/dash-relay.svg)](https://pypi.org/project/dash-relay/)
+[![Tests](https://github.com/rekeshali/dash-relay/actions/workflows/test.yml/badge.svg)](https://github.com/rekeshali/dash-relay/actions/workflows/test.yml)
+
 A tiny layer for building **dynamic Dash interfaces** without wiring a
 callback per interactive element.
 
