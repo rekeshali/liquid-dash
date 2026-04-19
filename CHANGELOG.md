@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] — 2026-04-18
+
+First release shipped via the new GitHub Actions Trusted-Publishing
+pipeline. No library code or surface changes — this is the inaugural
+test of `.github/workflows/publish.yml`. Future releases follow the
+same path: tag `vX.Y.Z`, push the tag, approve the prod step.
+
 ## [1.1.1] — 2026-04-18
 
 **Breaking kwarg renames on the public surface.** Normally these would
