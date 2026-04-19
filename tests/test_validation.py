@@ -8,7 +8,7 @@ def test_validate_flags_missing_bridge() -> None:
     layout = html.Div(
         [
             dcc.Store(id="bridge"),  # default bridge, but action points elsewhere
-            relay.emitter(html.Button("Delete"), "card.delete", to="ghost-bus"),
+            relay.emitter(html.Button("Delete"), "card.delete", bridge="ghost-bus"),
         ]
     )
     report = relay.validate(layout)

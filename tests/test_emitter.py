@@ -15,7 +15,7 @@ def test_emitter_wraps_any_component_with_data_attributes():
     props = _props(wrapped)
     assert props["data-relay-action"] == "card.delete"
     assert json.loads(props["data-relay-target"]) == "card-1"
-    assert props["data-relay-event"] == "click"
+    assert props["data-relay-on"] == "click"
     assert props["data-relay-bridge"] == "bridge"
     assert json.loads(props["data-relay-payload"]) == {"kind": "plot"}
     # Wrapper is transparent for layout purposes
@@ -23,10 +23,10 @@ def test_emitter_wraps_any_component_with_data_attributes():
 
 
 def test_emitter_supports_non_html_components_via_wrapper():
-    wrapped = relay.emitter(dcc.Input(placeholder="search"), "search", event="input")
+    wrapped = relay.emitter(dcc.Input(placeholder="search"), "search", on="input")
     props = _props(wrapped)
     assert props["data-relay-action"] == "search"
-    assert props["data-relay-event"] == "input"
+    assert props["data-relay-on"] == "input"
     # The wrapped Input is the sole child
     children = props["children"]
     first = children[0] if isinstance(children, list) else children
@@ -34,7 +34,7 @@ def test_emitter_supports_non_html_components_via_wrapper():
 
 
 def test_emitter_curried_form_returns_reusable_emitter():
-    delete = relay.emitter("delete", to="bus")
+    delete = relay.emitter("delete", bridge="bus")
     a = delete(html.Button("x"), payload={"id": 1})
     b = delete(html.Button("y"), payload={"id": 2})
     assert _props(a)["data-relay-bridge"] == "bus"
@@ -44,7 +44,7 @@ def test_emitter_curried_form_returns_reusable_emitter():
 
 
 def test_emitter_prevent_default_flag_is_serialized():
-    wrapped = relay.emitter(html.Form([]), "save", event="submit", prevent_default=True)
+    wrapped = relay.emitter(html.Form([]), "save", on="submit", prevent_default=True)
     props = _props(wrapped)
     assert props["data-relay-prevent-default"] == "true"
 

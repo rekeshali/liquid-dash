@@ -304,11 +304,11 @@ def _render_ld_column(state):
             relay.emitter(
                 html.Button(f["name"], style={"border": "none", "background": "none",
                                               "cursor": "pointer", "padding": "0", "fontSize": "13px"}),
-                "folder.activate", target=f["id"], to="relay-bridge",
+                "folder.activate", target=f["id"], bridge="relay-bridge",
             ),
-            relay.emitter(html.Button("×", style=_BTN), "folder.delete", target=f["id"], to="relay-bridge"),
+            relay.emitter(html.Button("×", style=_BTN), "folder.delete", target=f["id"], bridge="relay-bridge"),
         ], style=style))
-    folder_tiles.append(relay.emitter(html.Button("+ Folder", style=_BTN), "folder.add", to="relay-bridge"))
+    folder_tiles.append(relay.emitter(html.Button("+ Folder", style=_BTN), "folder.add", bridge="relay-bridge"))
 
     tab_tiles = []
     if folder:
@@ -318,11 +318,11 @@ def _render_ld_column(state):
                 relay.emitter(
                     html.Button(t["name"], style={"border": "none", "background": "none",
                                                   "cursor": "pointer", "padding": "0", "fontSize": "13px"}),
-                    "tab.activate", target=t["id"], to="relay-bridge",
+                    "tab.activate", target=t["id"], bridge="relay-bridge",
                 ),
-                relay.emitter(html.Button("×", style=_BTN), "tab.delete", target=t["id"], to="relay-bridge"),
+                relay.emitter(html.Button("×", style=_BTN), "tab.delete", target=t["id"], bridge="relay-bridge"),
             ], style=style))
-        tab_tiles.append(relay.emitter(html.Button("+ Tab", style=_BTN), "tab.add", to="relay-bridge"))
+        tab_tiles.append(relay.emitter(html.Button("+ Tab", style=_BTN), "tab.add", bridge="relay-bridge"))
 
     panel_cards = []
     if tab:
@@ -331,13 +331,13 @@ def _render_ld_column(state):
                 html.Div(p["name"], style={"fontWeight": "600", "fontSize": "13px"}),
                 html.Span(p["kind"], style=_KIND_BADGE),
                 html.Div([
-                    relay.emitter(html.Button("dup", style=_BTN), "panel.duplicate", target=p["id"], to="relay-bridge"),
-                    relay.emitter(html.Button("×", style=_BTN), "panel.delete", target=p["id"], to="relay-bridge"),
+                    relay.emitter(html.Button("dup", style=_BTN), "panel.duplicate", target=p["id"], bridge="relay-bridge"),
+                    relay.emitter(html.Button("×", style=_BTN), "panel.delete", target=p["id"], bridge="relay-bridge"),
                 ], style={"display": "flex", "gap": "4px", "marginTop": "auto"}),
             ], style=_PANEL_CARD))
 
     add_panel_buttons = html.Div([
-        relay.emitter(html.Button(f"+ {k}", style=_BTN), "panel.add", payload={"kind": k}, to="relay-bridge")
+        relay.emitter(html.Button(f"+ {k}", style=_BTN), "panel.add", payload={"kind": k}, bridge="relay-bridge")
         for k in KINDS
     ], style={"display": "flex", "gap": "6px", "marginTop": "10px"})
 

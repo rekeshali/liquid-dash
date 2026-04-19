@@ -62,7 +62,7 @@ def _btn(label, action, *, target=None, payload=None, className=None, style=None
         kwargs["style"] = style
     if title is not None:
         kwargs["title"] = title
-    return relay.emitter(html.Button(label, **kwargs), action, target=target, payload=payload, to=UI_EVENT_BRIDGE)
+    return relay.emitter(html.Button(label, **kwargs), action, target=target, payload=payload, bridge=UI_EVENT_BRIDGE)
 
 
 # --- State factories -------------------------------------------------------

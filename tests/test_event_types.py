@@ -1,6 +1,6 @@
 """End-to-end verification that any DOM event type works.
 
-The library claims `any DOM event name works for event=`. This file
+The library claims `any DOM event name works for on=`. This file
 launches a real Dash app, mounts one emitter per event type, dispatches
 each event through a real browser via Playwright, and asserts the
 bridge store receives the correct `action` and `event_type`.
@@ -59,17 +59,17 @@ def _build_app() -> Dash:
     app.layout = html.Div([
         relay.bridge(),
         relay.emitter(html.Button("click", id="t-click"), "click"),
-        relay.emitter(html.Button("dbl", id="t-dblclick"), "dblclick-action", event="dblclick"),
-        relay.emitter(dcc.Input(id="t-input", placeholder="input"), "input-action", event="input"),
-        relay.emitter(dcc.Input(id="t-change", placeholder="change"), "change-action", event="change"),
-        relay.emitter(html.Button("submit", id="t-submit"), "submit-action", event="submit"),
-        relay.emitter(dcc.Input(id="t-keydown", placeholder="keydown"), "keydown-action", event="keydown"),
-        relay.emitter(html.Div("ctx", id="t-contextmenu"), "contextmenu-action", event="contextmenu"),
-        relay.emitter(html.Div("pd", id="t-pointerdown"), "pointerdown-action", event="pointerdown"),
-        relay.emitter(html.Div("wheel", id="t-wheel"), "wheel-action", event="wheel"),
-        relay.emitter(dcc.Input(id="t-focus", placeholder="focus"), "focus-action", event="focus"),
-        relay.emitter(dcc.Input(id="t-blur", placeholder="blur"), "blur-action", event="blur"),
-        relay.emitter(html.Div("custom", id="t-custom"), "custom-action", event="my-custom-event"),
+        relay.emitter(html.Button("dbl", id="t-dblclick"), "dblclick-action", on="dblclick"),
+        relay.emitter(dcc.Input(id="t-input", placeholder="input"), "input-action", on="input"),
+        relay.emitter(dcc.Input(id="t-change", placeholder="change"), "change-action", on="change"),
+        relay.emitter(html.Button("submit", id="t-submit"), "submit-action", on="submit"),
+        relay.emitter(dcc.Input(id="t-keydown", placeholder="keydown"), "keydown-action", on="keydown"),
+        relay.emitter(html.Div("ctx", id="t-contextmenu"), "contextmenu-action", on="contextmenu"),
+        relay.emitter(html.Div("pd", id="t-pointerdown"), "pointerdown-action", on="pointerdown"),
+        relay.emitter(html.Div("wheel", id="t-wheel"), "wheel-action", on="wheel"),
+        relay.emitter(dcc.Input(id="t-focus", placeholder="focus"), "focus-action", on="focus"),
+        relay.emitter(dcc.Input(id="t-blur", placeholder="blur"), "blur-action", on="blur"),
+        relay.emitter(html.Div("custom", id="t-custom"), "custom-action", on="my-custom-event"),
         html.Pre(id="bridge-view"),
     ])
 

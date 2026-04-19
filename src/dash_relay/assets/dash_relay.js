@@ -54,7 +54,7 @@
       ? event.target.closest("[data-relay-action]")
       : null;
     if (!start) return;
-    if (start.dataset.relayEvent !== event.type) return;
+    if (start.dataset.relayOn !== event.type) return;
     if (start.hasAttribute("disabled") || start.getAttribute("aria-disabled") === "true") return;
 
     var bridge = getBridge(start);
@@ -90,11 +90,11 @@
   function scan(root) {
     if (!root) return;
     if (root.nodeType !== 1 && root.nodeType !== 9 && root.nodeType !== 11) return;
-    if (root.dataset && root.dataset.relayEvent) ensureListener(root.dataset.relayEvent);
+    if (root.dataset && root.dataset.relayOn) ensureListener(root.dataset.relayOn);
     if (root.querySelectorAll) {
-      var nodes = root.querySelectorAll("[data-relay-event]");
+      var nodes = root.querySelectorAll("[data-relay-on]");
       for (var i = 0; i < nodes.length; i++) {
-        ensureListener(nodes[i].dataset.relayEvent);
+        ensureListener(nodes[i].dataset.relayOn);
       }
     }
   }
@@ -118,7 +118,7 @@
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["data-relay-event"],
+      attributeFilter: ["data-relay-on"],
     });
   }
 

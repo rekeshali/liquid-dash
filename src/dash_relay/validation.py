@@ -74,7 +74,7 @@ def validate(layout, *, strict: bool = False, registry: Any = None) -> Validatio
       - empty-action: an element has data-relay-action set to empty string
       - missing-bridge: an element targets a bridge id that is not present
         as a dcc.Store in the layout
-      - empty-event: an element has data-relay-event set to empty string
+      - empty-event: an element has data-relay-on set to empty string
       - orphan-emitter: an emitter's action has no matching handler on the
         supplied registry (a user click that lands nowhere).
         Only reported when ``registry=`` is provided.
@@ -139,13 +139,13 @@ def validate(layout, *, strict: bool = False, registry: Any = None) -> Validatio
             own_bridge = props.get("data-relay-bridge") or ""
             action_targets.append((own_bridge, cid))
 
-            ev = props.get("data-relay-event")
+            ev = props.get("data-relay-on")
             if ev is not None and not str(ev).strip():
                 report.issues.append(
                     ValidationIssue(
                         level="warning",
                         code="empty-event",
-                        message="Element has empty data-relay-event.",
+                        message="Element has empty data-relay-on.",
                         component_id=cid,
                     )
                 )
