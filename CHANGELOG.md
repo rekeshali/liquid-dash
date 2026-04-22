@@ -86,6 +86,25 @@ declare — there's no `bridge()` factory, no store catalog, no
   after construction — either the explicit value or
   `"dash-relay-bridge"`.
 
+- **Event dict keys finalized.** The envelope passed to handlers is
+  frozen for v4 with these keys:
+
+    | key | type | what it is |
+    |---|---|---|
+    | `action` | `str` | the Action name |
+    | `bridge` | `str` | the bridge that fired |
+    | `target` | `str | int | dict | None` | user-defined target value, parsed back from the wire |
+    | `source` | `str | None` | source component id (auto-filled by `Emitter.wrap()`) |
+    | `payload` | `dict | None` | user-supplied payload |
+    | `type` | `str` | DOM event name — same as JS `event.type` (renamed from 3.x `event_type`) |
+    | `details` | `dict` | extracted browser fields off the DOM event — same shape as `CustomEvent.detail` (renamed from 3.x `native`) |
+    | `timestamp` | `float` | seconds since epoch (client clock) |
+
+  The renames `event_type → type` and `native → details` align with
+  DOM/JS vocabulary. Handler bodies that read `event["event_type"]`
+  or `event["native"]` need updating to `event["type"]` /
+  `event["details"]`.
+
 ### Lifecycle contract
 
 `install(app)` must be called exactly once per app, after `app.layout`

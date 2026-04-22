@@ -99,8 +99,8 @@
       payload: parseJsonAttr(start.dataset.relayPayload, "payload"),
       source: readSourceAttr(start.dataset.relaySource),
       bridge: bridge,
-      event_type: event.type,
-      native: extractEventFields(event),
+      type: event.type,
+      details: extractEventFields(event),
       timestamp: Date.now() / 1000,
     };
 

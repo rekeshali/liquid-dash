@@ -3,7 +3,7 @@
 The library claims `any DOM event name works for on=`. This file
 launches a real Dash app, mounts one emitter per event type, dispatches
 each event through a real browser via Playwright, and asserts the
-bridge store receives the correct `action` and `event_type`.
+bridge store receives the correct `action` and `type`.
 
 Covers twelve events spanning:
   - common UI events (click, dblclick, input, change, submit, keydown)
@@ -160,7 +160,7 @@ def _dispatch_and_wait(page, js: str, expected_action: str, timeout: float = 5.0
 
 # Each row: (test_id, expected_action, expected_event_type, dispatch_js)
 # dispatch_js is evaluated in the page — it triggers the event and should
-# result in the bridge store receiving an envelope with .action and .event_type.
+# result in the bridge store receiving an envelope with .action and .type.
 EVENT_CASES = [
     (
         "click",
@@ -258,12 +258,12 @@ def test_event_type_flows_to_bridge(
     page, case_id, expected_action, expected_event_type, dispatch_js,
 ):
     ev = _dispatch_and_wait(page, dispatch_js, expected_action)
-    assert ev["event_type"] == expected_event_type, (
-        f"expected event_type={expected_event_type!r}, got {ev['event_type']!r}"
+    assert ev["type"] == expected_event_type, (
+        f"expected type={expected_event_type!r}, got {ev['type']!r}"
     )
     assert ev["action"] == expected_action
     # Every envelope should carry the mandatory keys.
-    for key in ("action", "target", "source", "bridge", "event_type", "native", "timestamp"):
+    for key in ("action", "target", "source", "bridge", "type", "details", "timestamp"):
         assert key in ev, f"missing {key} in envelope: {ev}"
 
 

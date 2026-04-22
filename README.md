@@ -93,7 +93,7 @@ def delete_item(event, s):
 
 @relay.callback(Output("state", "data"), Action("draft"), State("state", "data"))
 def update_draft(event, s):
-    return {**s, "draft": event["native"].get("value", "")}
+    return {**s, "draft": event["details"].get("value", "")}
 
 
 # Layout: one state store + your interactive elements wrapped or
@@ -288,8 +288,8 @@ a separate non-relay `@app.callback` for the pattern-matched case.
 | `target` | `str | int | dict | None` | user-defined target value, parsed back from the wire |
 | `source` | `str | None` | source component id (auto-filled from wrap, optional) |
 | `payload` | `dict | None` | user-supplied payload |
-| `event_type` | `str` | DOM event name (click, keydown, blur, ...) |
-| `native` | `dict` | extracted browser fields (value, checked, key, clientX/Y, deltaX/Y, button) |
+| `type` | `str` | DOM event name (click, keydown, blur, ...) — same as JS `event.type` |
+| `details` | `dict` | extracted browser fields off the DOM event (value, checked, key, clientX/Y, deltaX/Y, button) — same shape as `CustomEvent.detail` |
 | `timestamp` | `float` | seconds since epoch (client clock) |
 
 ### `relay.validate(layout=None, *, strict=False, app=None)`
