@@ -4,6 +4,120 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] — 2026-04-22
+
+The dispatch surface is rebuilt around Dash's own callback primitives.
+`relay.registry(...)` and the `Registry` class are gone; handlers are
+declared with `@relay.handle` decorators that read like Dash callbacks
+with a single `Action(...)` dependency standing in for `Input`.
+
+### Why
+
+The 1.x and 2.x registries packaged the bridge wiring as a custom
+class with its own kwargs (`state=` / `output=` / `bridge=`) and its
+own handler-signature contract. Reading a registry call required
+learning a small DSL that mirrored — but didn't reuse — Dash's own
+vocabulary. 3.0 collapses that:
+
+  * Handlers are decorated, not registered through a class.
+  * Dependencies are spelled with the same `Output`, `State` Dash
+    users already know, plus one new `Action(name)` primitive that
+    slots where `Input` would.
+  * The handler signature follows Dash's positional convention (one
+    arg per declared dependency, in declaration order, with `Output`
+    declarations excluded).
+  * Bridge ownership lives at the emitter side only; handlers don't
+    declare which bridge they listen on.
+
+The library shrinks: no `Registry` class, no `output=`/`state=`
+kwargs, no per-handler signature contract beyond "Dash with `Action`
+in the trigger slot."
+
+### Public surface
+
+```python
+import dash_relay as relay
+from dash_relay import Action
+from dash import Output, State
+
+relay.install(app)                                            # runtime + dispatcher
+relay.bridge(id="bridge")                                     # dcc.Store sink
+relay.emitter(component, action, bridge="bridge", ...)        # wrap a component
+relay.validate(layout, app=None)                              # linter
+
+@relay.handle(Output("x", "data"), Action("a"), State("x", "data"))
+def handler(event, x): ...
+```
+
+### Rename map (from 1.x)
+
+| 1.x | 3.0 |
+|---|---|
+| `events = relay.registry(app, state="x")` | `@relay.handle(Output("x", "data"), Action("..."), State("x", "data"))` |
+| `events = relay.registry(app, state=["a", "b"])` | each handler declares its own `Output(...)` and `State(...)` deps |
+| `@events.handler("foo")` | `@relay.handle(Output(...), Action("foo"), State(...))` |
+| `def _(state, payload, event):` | `def _(event, state):` (positional, mirrors Dash) |
+| `def _(states, payload, event):` (multi-state) | `def _(event, a, b):` for `State("a", ...), State("b", ...)` |
+| `state["x"] += 1; return state` | `return {**state, "x": state["x"] + 1}` (or `s = deepcopy(state); s["x"] += 1; return s`) |
+| `events.dispatch(event, state)` | `app._dash_relay_dispatcher(event, state)` (test wrapper) |
+
+### Architecture
+
+`@relay.handle` decorators accumulate in a module-level pending pool.
+`install(app)` consumes the pool: for each registered bridge it
+registers one Dash callback whose `Output`s are the union of every
+handler's declared outputs and whose `State`s are the union of every
+handler's declared states. The dispatcher routes by action name and
+pads non-touched outputs with `no_update`. When more than one bridge
+is registered, `install()` forces `allow_duplicate=True` on every
+output so the per-bridge dispatchers coexist.
+
+### Construction-time invariants
+
+- Each `@handle` block must contain at least one `Output` and exactly
+  one `Action` (multi-`Action` handlers raise `NotImplementedError`
+  in v1).
+- Two handlers can't claim the same action name — `install()` raises
+  `ValueError` if you try.
+- Handler-declared `Output`/`State` ids are checked against the
+  layout's `dcc.Store`s by `validate()`.
+
+### `validate()` codes
+
+When `app=` is passed (after install):
+- `orphan-emitter` — emitter action has no matching handler
+- `orphan-handler` — handler has no emitter in the layout
+- `output-not-found` — handler `Output` id not in layout
+- `state-not-found` — handler `State` id not in layout
+
+The handler pool is cached on the app object as `app._dash_relay_handlers`
+so `validate()` can introspect after install.
+
+### Migration
+
+Quiver-scale migration is mechanical:
+
+1. Delete every `events = relay.registry(...)` construction.
+2. For each `@events.handler("foo")`, rewrite as
+   `@relay.handle(Output(...), Action("foo"), State(...))` with the
+   appropriate Output/State dependencies pulled from the old
+   registry's `state=` arg.
+3. Convert the handler signature: `def _(state, payload, event)` →
+   `def _(event, state)`. For multi-state handlers, each of the old
+   `state` tuple's slots becomes its own positional arg matching the
+   declared `State(...)`.
+4. Move `relay.install(app)` to AFTER all decorators run.
+5. Tests that called `events.dispatch(...)` switch to
+   `app._dash_relay_dispatcher(...)` (same shape: positional event +
+   state values).
+
+### Removed
+
+- `relay.registry()` and `Registry` class
+- `Registry.dispatch()`, `Registry.handler()`, `Registry.actions()`,
+  `Registry.output_ids()`, `Registry.state_ids()`, `Registry.bridge_ids()`
+- `validate(layout, registry=...)` — replaced with `validate(layout, app=...)`
+
 ## [1.1.2] — 2026-04-18
 
 First release shipped via the new GitHub Actions Trusted-Publishing

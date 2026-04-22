@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dash-relay"
-version = "1.1.2"
-description = "Client-side event bridge for Dash with a per-action handler registry."
+version = "3.0.0"
+description = "Client-side event bridge for Dash with action-based dispatch in Dash-native callback shape."
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [

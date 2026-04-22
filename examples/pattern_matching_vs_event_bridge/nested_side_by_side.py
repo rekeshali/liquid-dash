@@ -37,6 +37,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 import dash_relay as relay
+from dash_relay import Action
 
 
 # ---------------------------------------------------------------------------
@@ -835,7 +836,6 @@ _CONSOLE_JS = r"""
 
 
 app = Dash(__name__, suppress_callback_exceptions=True)
-relay.install(app)
 app.index_string = app.index_string.replace("<head>", "<head>" + _CONSOLE_JS, 1)
 
 
@@ -996,52 +996,75 @@ def pd_panel_duplicate(_clicks, s):
 # >>> RELAY-ACTIONS-BEGIN
 
 
-events = relay.registry(app, state="relay-state", bridge="relay-bridge")
+_RELAY_OUTPUT = Output("relay-state", "data")
+_RELAY_STATE = State("relay-state", "data")
 
 
-@events.handler("folder.add")
-def _(s, payload, event):
+def _relay_state(s):
+    return deepcopy(s) if s is not None else initial_state()
+
+
+@relay.handle(_RELAY_OUTPUT, Action("folder.add"), _RELAY_STATE)
+def _(event, s):
+    s = _relay_state(s)
     do_folder_add(s)
+    return s
 
 
-@events.handler("folder.activate")
-def _(s, payload, event):
+@relay.handle(_RELAY_OUTPUT, Action("folder.activate"), _RELAY_STATE)
+def _(event, s):
+    s = _relay_state(s)
     do_folder_activate(s, event["target"])
+    return s
 
 
-@events.handler("folder.delete")
-def _(s, payload, event):
+@relay.handle(_RELAY_OUTPUT, Action("folder.delete"), _RELAY_STATE)
+def _(event, s):
+    s = _relay_state(s)
     do_folder_delete(s, event["target"])
+    return s
 
 
-@events.handler("tab.add")
-def _(s, payload, event):
+@relay.handle(_RELAY_OUTPUT, Action("tab.add"), _RELAY_STATE)
+def _(event, s):
+    s = _relay_state(s)
     do_tab_add(s)
+    return s
 
 
-@events.handler("tab.activate")
-def _(s, payload, event):
+@relay.handle(_RELAY_OUTPUT, Action("tab.activate"), _RELAY_STATE)
+def _(event, s):
+    s = _relay_state(s)
     do_tab_activate(s, event["target"])
+    return s
 
 
-@events.handler("tab.delete")
-def _(s, payload, event):
+@relay.handle(_RELAY_OUTPUT, Action("tab.delete"), _RELAY_STATE)
+def _(event, s):
+    s = _relay_state(s)
     do_tab_delete(s, event["target"])
+    return s
 
 
-@events.handler("panel.add")
-def _(s, payload, event):
-    do_panel_add(s, (payload or {}).get("kind", "timeseries"))
+@relay.handle(_RELAY_OUTPUT, Action("panel.add"), _RELAY_STATE)
+def _(event, s):
+    s = _relay_state(s)
+    do_panel_add(s, (event.get("payload") or {}).get("kind", "timeseries"))
+    return s
 
 
-@events.handler("panel.delete")
-def _(s, payload, event):
+@relay.handle(_RELAY_OUTPUT, Action("panel.delete"), _RELAY_STATE)
+def _(event, s):
+    s = _relay_state(s)
     do_panel_delete(s, event["target"])
+    return s
 
 
-@events.handler("panel.duplicate")
-def _(s, payload, event):
+@relay.handle(_RELAY_OUTPUT, Action("panel.duplicate"), _RELAY_STATE)
+def _(event, s):
+    s = _relay_state(s)
     do_panel_duplicate(s, event["target"])
+    return s
 
 
 @app.callback(Output("relay-root", "children"), Input("relay-state", "data"))
@@ -1115,11 +1138,13 @@ def _count_source_lines(begin_marker, end_marker):
 
 _PD_CB_COUNT = _count_callbacks("pd-")
 _RELAY_CB_COUNT = _count_callbacks("relay-")
-# Dash Relay also has per-action handlers registered via @events.handler(...).
+# Dash Relay also has per-action handlers registered via @relay.handle(...).
 # They're not in the Dash callback graph (one Dash dispatch callback routes
 # to all of them by action name), so they don't inflate phantom-fire cost
 # the way pattern-matching callbacks do. But they're still code we wrote.
-_RELAY_HANDLER_COUNT = len(events._handlers)
+# Counted from the pending pool BEFORE relay.install(app) drains it.
+from dash_relay.handle import _PENDING_HANDLERS as _relay_pending
+_RELAY_HANDLER_COUNT = sum(1 for h in _relay_pending if h.action.name.split(".")[0] in ("folder", "tab", "panel"))
 _PD_LINES = _count_source_lines("PD-ACTIONS-BEGIN", "PD-ACTIONS-END")
 _RELAY_LINES = _count_source_lines("RELAY-ACTIONS-BEGIN", "RELAY-ACTIONS-END")
 
@@ -1213,6 +1238,11 @@ app.layout = html.Div([
     "maxWidth": "1700px",
     "margin": "0 auto",
 })
+
+
+# install() drains the @relay.handle pool registered above, registers
+# the JS runtime + Flask route, and wires the dispatcher Dash callback.
+relay.install(app)
 
 
 if __name__ == "__main__":

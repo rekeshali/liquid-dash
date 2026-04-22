@@ -14,6 +14,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 import dash_relay as relay
+from dash_relay import Action
 
 
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
@@ -946,9 +947,39 @@ def build_render_summary(state: dict[str, Any] | None) -> tuple[str, str]:
 
 # --- App construction ------------------------------------------------------
 
+def _register_handlers() -> None:
+    """Wire each pure action function in _ACTIONS into @relay.handle.
+
+    Pure functions keep their (states_tuple, payload, event) signature so
+    the test-side reduce_ui_event helper can drive them directly. The
+    @relay.handle wrappers below adapt to the 3.0 handler signature
+    (event, canvas, editor) and the (canvas, editor) tuple return shape.
+    """
+    for action_name, pure_fn in _ACTIONS.items():
+        _make_handler(action_name, pure_fn)
+
+
+def _make_handler(action_name, pure_fn):
+    @relay.handle(
+        Output(CANVAS_STORE, "data"),
+        Output(EDITOR_STORE, "data"),
+        Action(action_name),
+        State(CANVAS_STORE, "data"),
+        State(EDITOR_STORE, "data"),
+    )
+    def _wrapped(event, canvas, editor):
+        canvas = deepcopy(canvas) if canvas is not None else default_canvas_state()
+        editor = deepcopy(editor) if editor is not None else default_editor_state()
+        payload = event.get("payload") or {}
+        result = pure_fn((canvas, editor), payload, event)
+        if result is None:
+            return canvas, editor
+        return result
+    return _wrapped
+
+
 def build_app() -> Dash:
     app = Dash(__name__, assets_folder=str(ASSETS_DIR))
-    relay.install(app)
 
     toolbar = html.Div(
         [
@@ -1187,14 +1218,11 @@ def build_app() -> Dash:
         ],
     )
 
-    # Callback 1: UI events → (canvas, editor)
-    # relay.registry() registers one internal callback that reads the bridge,
-    # dispatches to the matching handler in _ACTIONS, and writes both
-    # state stores. The handlers below re-use the module-level _ACTIONS
-    # table so `reduce_ui_event` and this runtime path stay in sync.
-    events = relay.registry(app, state=[CANVAS_STORE, EDITOR_STORE], bridge=UI_EVENT_BRIDGE)
-    for _name, _fn in _ACTIONS.items():
-        events.handler(_name)(_fn)
+    # Callback 1: UI events → (canvas, editor).
+    # Each pure action in _ACTIONS becomes a @relay.handle entry; the
+    # install() call at the end of build_app() consumes the pool and
+    # registers one dispatcher Dash callback for UI_EVENT_BRIDGE.
+    _register_handlers()
 
     # Callback 2: render workspace chrome
     @app.callback(
@@ -1337,6 +1365,10 @@ def build_app() -> Dash:
     )
     def close_editor(_n_clicks):
         return close_editor_state()
+
+    # Drains the handler pool and registers one dispatcher per bridge.
+    # Must run AFTER all @relay.handle decorators have populated the pool.
+    relay.install(app)
 
     return app
 

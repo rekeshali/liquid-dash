@@ -66,28 +66,32 @@ def _iter_children(children: Any):
     yield children
 
 
-def validate(layout, *, strict: bool = False, registry: Any = None) -> ValidationReport:
+def validate(
+    layout,
+    *,
+    strict: bool = False,
+    app: Any = None,
+) -> ValidationReport:
     """Walk a Dash layout for common Dash Relay mistakes.
 
-    Reports:
+    Layout-only checks (always run):
       - duplicate-id: two components share an id
       - empty-action: an element has data-relay-action set to empty string
-      - missing-bridge: an element targets a bridge id that is not present
-        as a dcc.Store in the layout
       - empty-event: an element has data-relay-on set to empty string
-      - orphan-emitter: an emitter's action has no matching handler on the
-        supplied registry (a user click that lands nowhere).
-        Only reported when ``registry=`` is provided.
-      - orphan-handler: a registered handler has no emitter in the layout
-        using its action name. Only reported when ``registry=`` is provided.
-        Note: this may be a false positive for apps that render emitters
-        dynamically inside callbacks — the initial layout won't contain them.
+      - missing-bridge: an element targets a bridge id that is not
+        present as a dcc.Store in the layout
 
-    Pass ``registry=events`` (the ``Registry`` returned by
-    ``relay.registry(app, state=...)``) to enable the orphan checks. The
-    registry only needs to expose ``.actions() -> Iterable[str]``.
+    Handler cross-checks (only when ``app=`` is supplied AND
+    ``relay.install(app)`` has run):
+      - orphan-emitter: an emitter's action has no matching handler
+      - orphan-handler: a handler is registered for an action that no
+        emitter in the layout uses
+      - output-not-found: a handler declares an Output with an id that
+        is not a dcc.Store in the layout
+      - state-not-found: a handler declares a State with an id that is
+        not a dcc.Store in the layout
 
-    If `strict=True`, raises UnsafeLayoutError when any issue is found.
+    If ``strict=True``, raises ``UnsafeLayoutError`` when any issue is found.
     """
     report = ValidationReport()
     seen_ids: set[str] = set()
@@ -155,7 +159,7 @@ def validate(layout, *, strict: bool = False, registry: Any = None) -> Validatio
 
     walk(layout)
 
-    # Check bridges referenced by actions exist as Stores
+    # Bridges referenced by emitter actions must exist as Stores
     reachable_bridges = store_ids | scopes
     for own_bridge, cid in action_targets:
         target = own_bridge if own_bridge else None
@@ -181,17 +185,11 @@ def validate(layout, *, strict: bool = False, registry: Any = None) -> Validatio
                 )
             )
 
-    # Cross-check emitter actions against the registry's handlers, if one
-    # was supplied. Action names are string-linked between emitter and
-    # handler; this catches typos on either side at load time.
-    if registry is not None:
-        try:
-            handler_actions = frozenset(registry.actions())
-        except AttributeError as exc:
-            raise TypeError(
-                "validate(registry=...) requires an object with an "
-                ".actions() method returning the registered action names."
-            ) from exc
+    # Handler cross-checks: only when an installed app is supplied.
+    if app is not None:
+        handlers = list(getattr(app, "_dash_relay_handlers", []))
+        handler_actions = {h.action.name for h in handlers}
+
         orphan_emitters = emitter_actions - handler_actions
         orphan_handlers = handler_actions - emitter_actions
         for action in sorted(orphan_emitters):
@@ -201,7 +199,7 @@ def validate(layout, *, strict: bool = False, registry: Any = None) -> Validatio
                     code="orphan-emitter",
                     message=(
                         f"Emitter action '{action}' has no matching handler "
-                        "on the registry — clicking this element is a no-op."
+                        "registered — clicking this element is a no-op."
                     ),
                 )
             )
@@ -215,6 +213,41 @@ def validate(layout, *, strict: bool = False, registry: Any = None) -> Validatio
                         "in the layout uses this action. (If emitters are "
                         "rendered dynamically from callbacks, this is expected.)"
                     ),
+                )
+            )
+
+        # Handler-declared Output / State ids must exist as dcc.Stores.
+        seen_output_ids: set[str] = set()
+        seen_state_ids: set[str] = set()
+        for h in handlers:
+            for o in h.outputs:
+                if isinstance(o.component_id, str):
+                    seen_output_ids.add(o.component_id)
+            for s in h.states:
+                if isinstance(s.component_id, str):
+                    seen_state_ids.add(s.component_id)
+        for sid in sorted(seen_output_ids - store_ids):
+            report.issues.append(
+                ValidationIssue(
+                    level="warning",
+                    code="output-not-found",
+                    message=(
+                        f"A handler declares Output('{sid}') but no dcc.Store "
+                        "with that id was found in the layout."
+                    ),
+                    component_id=sid,
+                )
+            )
+        for sid in sorted(seen_state_ids - store_ids):
+            report.issues.append(
+                ValidationIssue(
+                    level="warning",
+                    code="state-not-found",
+                    message=(
+                        f"A handler declares State('{sid}') but no dcc.Store "
+                        "with that id was found in the layout."
+                    ),
+                    component_id=sid,
                 )
             )
 

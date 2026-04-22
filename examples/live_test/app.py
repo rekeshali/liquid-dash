@@ -4,7 +4,7 @@ from copy import deepcopy
 from pathlib import Path
 import sys
 
-from dash import Dash, Input, Output, dcc, html, no_update
+from dash import Dash, Input, Output, State, dcc, html, no_update
 
 # Allow running the demo directly from the source tree before installation.
 ROOT = Path(__file__).resolve().parents[2]
@@ -13,6 +13,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 import dash_relay as relay
+from dash_relay import Action
 
 
 BADGE_COLORS = ["#2563eb", "#7c3aed", "#db2777", "#f59e0b", "#059669"]
@@ -152,91 +153,123 @@ def find_panel(state: dict, panel_id: str | None) -> dict | None:
 
 ASSETS = Path(__file__).with_name("assets")
 app = Dash(__name__, assets_folder=str(ASSETS))
-relay.install(app)
-
-events = relay.registry(app, state="app-state")
 
 
-@events.handler("panel.add")
-def _(state, payload, event):
-    kind = (payload or {}).get("kind", "timeseries")
+def _payload(event: dict) -> dict:
+    return event.get("payload") or {}
+
+
+@relay.handle(Output("app-state", "data"), Action("panel.add"), State("app-state", "data"))
+def _(event, state):
+    state = deepcopy(state) if state is not None else default_state()
+    kind = _payload(event).get("kind", "timeseries")
     state["panels"].append(make_panel_state(state["next_index"], kind))
     state["next_index"] += 1
+    return state
 
 
-@events.handler("panel.delete")
-def _(state, payload, event):
+@relay.handle(Output("app-state", "data"), Action("panel.delete"), State("app-state", "data"))
+def _(event, state):
+    state = deepcopy(state) if state is not None else default_state()
     tid = event.get("target")
     state["panels"] = [p for p in state["panels"] if p["id"] != tid]
+    return state
 
 
-@events.handler("panel.duplicate")
-def _(state, payload, event):
+@relay.handle(Output("app-state", "data"), Action("panel.duplicate"), State("app-state", "data"))
+def _(event, state):
+    state = deepcopy(state) if state is not None else default_state()
     panel = find_panel(state, event.get("target"))
     if panel is None:
-        return
+        return no_update
     clone = deepcopy(panel)
     clone["id"] = f"panel-{state['next_index']}"
     clone["title"] = f"{panel['title']} Copy"
     clone["expanded"] = True
     state["next_index"] += 1
     state["panels"].append(clone)
+    return state
 
 
-@events.handler("panel.drawer.toggle")
-def _(state, payload, event):
+@relay.handle(Output("app-state", "data"), Action("panel.drawer.toggle"), State("app-state", "data"))
+def _(event, state):
+    state = deepcopy(state) if state is not None else default_state()
     panel = find_panel(state, event.get("target"))
-    if panel is not None:
-        panel["expanded"] = not bool(panel.get("expanded"))
+    if panel is None:
+        return no_update
+    panel["expanded"] = not bool(panel.get("expanded"))
+    return state
 
 
-@events.handler("panel.lock.toggle")
-def _(state, payload, event):
+@relay.handle(Output("app-state", "data"), Action("panel.lock.toggle"), State("app-state", "data"))
+def _(event, state):
+    state = deepcopy(state) if state is not None else default_state()
     panel = find_panel(state, event.get("target"))
-    if panel is not None:
-        panel["locked"] = not bool(panel.get("locked"))
+    if panel is None:
+        return no_update
+    panel["locked"] = not bool(panel.get("locked"))
+    return state
 
 
-@events.handler("panel.kind.set")
-def _(state, payload, event):
+@relay.handle(Output("app-state", "data"), Action("panel.kind.set"), State("app-state", "data"))
+def _(event, state):
+    state = deepcopy(state) if state is not None else default_state()
     panel = find_panel(state, event.get("target"))
-    if panel is not None:
-        set_kind(panel, cycle_kind(panel["kind"], (payload or {}).get("kind")))
+    if panel is None:
+        return no_update
+    set_kind(panel, cycle_kind(panel["kind"], _payload(event).get("kind")))
+    return state
 
 
-@events.handler("panel.badge.add")
-def _(state, payload, event):
+@relay.handle(Output("app-state", "data"), Action("panel.badge.add"), State("app-state", "data"))
+def _(event, state):
+    state = deepcopy(state) if state is not None else default_state()
     panel = find_panel(state, event.get("target"))
-    if panel is not None:
-        add_badge(panel)
+    if panel is None:
+        return no_update
+    add_badge(panel)
+    return state
 
 
-@events.handler("panel.badge.cycle")
-def _(state, payload, event):
+@relay.handle(Output("app-state", "data"), Action("panel.badge.cycle"), State("app-state", "data"))
+def _(event, state):
+    state = deepcopy(state) if state is not None else default_state()
     panel = find_panel(state, event.get("target"))
-    if panel is not None:
-        cycle_badge(panel)
+    if panel is None:
+        return no_update
+    cycle_badge(panel)
+    return state
 
 
-@events.handler("panel.badge.remove")
-def _(state, payload, event):
+@relay.handle(Output("app-state", "data"), Action("panel.badge.remove"), State("app-state", "data"))
+def _(event, state):
+    state = deepcopy(state) if state is not None else default_state()
     panel = find_panel(state, event.get("target"))
-    if panel is not None and panel["badges"]:
-        panel["badges"].pop()
+    if panel is None or not panel["badges"]:
+        return no_update
+    panel["badges"].pop()
+    return state
 
 
-@events.handler("panel.setting")
-def _(state, payload, event):
+@relay.handle(Output("app-state", "data"), Action("panel.setting"), State("app-state", "data"))
+def _(event, state):
+    state = deepcopy(state) if state is not None else default_state()
+    payload = _payload(event)
     panel = find_panel(state, event.get("target"))
-    if panel is not None and payload:
-        apply_setting(panel, payload)
+    if panel is None or not payload:
+        return no_update
+    apply_setting(panel, payload)
+    return state
+
+
+relay.install(app)
 
 
 def apply_event(state: dict, event: dict | None) -> dict:
-    """Thin wrapper used by tests: dispatches one liquid event through the registry."""
+    """Thin wrapper used by tests: dispatches one relay event through the dispatcher."""
     if not event:
         return state
-    result = events.dispatch(event, state)
+    result = app._dash_relay_dispatcher(event, state)
     return state if result is no_update else result
 
 
