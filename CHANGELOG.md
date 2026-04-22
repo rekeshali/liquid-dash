@@ -4,6 +4,69 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] — 2026-04-22
+
+`Action` gains an optional `bridge=` kwarg for disambiguating
+action-name collisions across bridges. Strictly additive — every 3.0
+call site continues to work unchanged.
+
+### What changed
+
+```python
+# 3.0 — action names live in a global namespace
+@relay.handle(Output(...), Action("close"), State(...))
+def _(event, ...): ...
+
+# 3.1 — pin a handler to a specific bridge
+@relay.handle(Output(...), Action("close", bridge="folder.tabbar"), State(...))
+def _(event, ...): ...
+```
+
+### Why
+
+In 3.0, action names lived in a global namespace — one handler per
+name across the entire app. If two emitters on different bridges
+genuinely used the same action string, you had to namespace at the
+action-name level (`tabbar.close` vs `drawer.close`) because there
+could only be one handler per name. The `bridge=` kwarg on `Action`
+lets you keep the short name and disambiguate via bridge instead.
+
+### Routing rule (specificity)
+
+When a bridge fires an action, the dispatcher prefers a pinned
+`(name, bridge)` match over a wildcard `(name, None)`. Concretely:
+
+  * `Action("close")` (no bridge) is a wildcard — fires for any bridge
+    that emits "close" and has no pinned override.
+  * `Action("close", bridge="x")` is pinned — fires only when bridge
+    "x" emits "close", shadowing any wildcard for that bridge.
+
+Per (action_name, bridge_id) key, at most one handler can register.
+Two wildcards for the same name still collide (today's rule). Two
+pinned handlers for the same `(name, bridge)` collide. A wildcard
+plus per-bridge pins for the same name is fine — pins shadow the
+wildcard for their bridge only.
+
+### `validate()` addition
+
+  * `unreachable-handler` — a handler is pinned to a bridge id that no
+    emitter in the layout actually writes to. The handler will never
+    fire; usually a typo or stale wiring.
+
+### Backwards compatibility
+
+`Action(name)` (no `bridge=`) behaves exactly as in 3.0. Every
+existing `@relay.handle` decorator continues to work without
+modification. The error message for two wildcards colliding now
+mentions `bridge=` as the disambiguation tool.
+
+### Implementation
+
+`Action` stores `name` and `bridge_id` (default `None`). Routing
+tables in the dispatcher split into `pinned_by_key{(name, bridge)}`
+and `wildcard_by_action{name}`. Lookup tries pinned first, falls
+back to wildcard. Roughly 25 lines of changes plus tests and docs.
+
 ## [3.0.0] — 2026-04-22
 
 The dispatch surface is rebuilt around Dash's own callback primitives.

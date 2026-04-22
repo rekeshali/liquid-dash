@@ -90,6 +90,8 @@ def validate(
         is not a dcc.Store in the layout
       - state-not-found: a handler declares a State with an id that is
         not a dcc.Store in the layout
+      - unreachable-handler: a handler is pinned via Action(bridge=) to
+        a bridge id that no emitter in the layout targets
 
     If ``strict=True``, raises ``UnsafeLayoutError`` when any issue is found.
     """
@@ -99,6 +101,7 @@ def validate(
     scopes: set[str] = set()
     action_targets: list[tuple[str, str | None]] = []  # (bridge_or_scope, component_id)
     emitter_actions: set[str] = set()
+    emitter_bridges: set[str] = set()  # bridges actually targeted by emitters
 
     def walk(component: Any):
         if component is None or isinstance(component, (str, int, float, bool)):
@@ -142,6 +145,8 @@ def validate(
                 emitter_actions.add(action_str)
             own_bridge = props.get("data-relay-bridge") or ""
             action_targets.append((own_bridge, cid))
+            if own_bridge:
+                emitter_bridges.add(own_bridge)
 
             ev = props.get("data-relay-on")
             if ev is not None and not str(ev).strip():
@@ -248,6 +253,27 @@ def validate(
                         "with that id was found in the layout."
                     ),
                     component_id=sid,
+                )
+            )
+
+        # Pinned handlers (Action(bridge="x")) whose bridge isn't actually
+        # targeted by any emitter in the layout will never fire — typo or
+        # stale wiring.
+        unreachable: set[tuple[str, str]] = set()
+        for h in handlers:
+            pinned = h.action.bridge_id
+            if pinned is not None and pinned not in emitter_bridges:
+                unreachable.add((h.action.name, pinned))
+        for action_name, bridge_id in sorted(unreachable):
+            report.issues.append(
+                ValidationIssue(
+                    level="warning",
+                    code="unreachable-handler",
+                    message=(
+                        f"Handler for action '{action_name}' is pinned to "
+                        f"bridge '{bridge_id}', but no emitter in the layout "
+                        "writes to that bridge — the handler will never fire."
+                    ),
                 )
             )
 

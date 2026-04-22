@@ -431,5 +431,163 @@ def test_two_handlers_same_action_rejected_at_install():
     def _(event): return {}
 
     app = _app("a")
-    with pytest.raises(ValueError, match="Multiple handlers"):
+    with pytest.raises(ValueError, match="Multiple wildcard handlers"):
         relay.install(app)
+
+
+# ---------------------------------------------------------------------------
+# Action(bridge=) — pinning, deduplication, specificity routing
+# ---------------------------------------------------------------------------
+
+
+def test_action_accepts_bridge_kwarg():
+    a = Action("close", bridge="folder.tabbar")
+    assert a.name == "close"
+    assert a.bridge_id == "folder.tabbar"
+    assert repr(a) == "Action('close', bridge='folder.tabbar')"
+
+
+def test_action_default_bridge_is_none_wildcard():
+    a = Action("close")
+    assert a.bridge_id is None
+    assert repr(a) == "Action('close')"
+
+
+def test_action_rejects_non_string_bridge():
+    with pytest.raises(TypeError):
+        Action("close", bridge=42)
+
+
+def test_action_rejects_empty_bridge():
+    with pytest.raises(ValueError):
+        Action("close", bridge="")
+    with pytest.raises(ValueError):
+        Action("close", bridge="   ")
+
+
+def test_action_equality_includes_bridge():
+    assert Action("a") != Action("a", bridge="x")
+    assert Action("a", bridge="x") == Action("a", bridge="x")
+    assert Action("a", bridge="x") != Action("a", bridge="y")
+    assert hash(Action("a", bridge="x")) != hash(Action("a"))
+
+
+def test_two_pinned_handlers_same_name_different_bridges_coexist():
+    # Two emitters in two bridges using the same action name "close",
+    # each handled by its own pinned handler. Today this would force
+    # action-name namespacing; with bridge= it just works.
+    @relay.handle(
+        Output("a", "data"),
+        Action("close", bridge="bridge-a"),
+        State("a", "data"),
+    )
+    def for_a(event, current):
+        return {"closed_by": "a"}
+
+    @relay.handle(
+        Output("b", "data"),
+        Action("close", bridge="bridge-b"),
+        State("b", "data"),
+    )
+    def for_b(event, current):
+        return {"closed_by": "b"}
+
+    app = Dash(__name__)
+    app.layout = html.Div([
+        dcc.Store(id="a"),
+        dcc.Store(id="b"),
+        relay.bridge("bridge-a"),
+        relay.bridge("bridge-b"),
+    ])
+    relay.install(app)
+
+    dispatch = app._dash_relay_dispatcher
+    # bridge-a fires "close" → only for_a runs (writes "a", b stays no_update)
+    result = dispatch({"action": "close", "bridge": "bridge-a"}, {}, {})
+    assert result == [{"closed_by": "a"}, no_update]
+
+    # bridge-b fires "close" → only for_b runs
+    result = dispatch({"action": "close", "bridge": "bridge-b"}, {}, {})
+    assert result == [no_update, {"closed_by": "b"}]
+
+
+def test_two_pinned_to_same_bridge_same_action_collide():
+    @relay.handle(Output("a", "data"), Action("close", bridge="x"))
+    def _(event): return {}
+
+    @relay.handle(Output("a", "data"), Action("close", bridge="x"))
+    def _(event): return {}
+
+    app = Dash(__name__)
+    app.layout = html.Div([dcc.Store(id="a"), relay.bridge("x")])
+    with pytest.raises(ValueError, match="pinned to bridge"):
+        relay.install(app)
+
+
+def test_pinned_shadows_wildcard_for_its_specific_bridge():
+    @relay.handle(Output("a", "data"), Action("close"), State("a", "data"))
+    def wildcard(event, current):
+        return {"by": "wildcard"}
+
+    @relay.handle(Output("a", "data"), Action("close", bridge="bridge-special"), State("a", "data"))
+    def pinned(event, current):
+        return {"by": "pinned"}
+
+    app = Dash(__name__)
+    app.layout = html.Div([
+        dcc.Store(id="a"),
+        relay.bridge("bridge-default"),
+        relay.bridge("bridge-special"),
+    ])
+    relay.install(app)
+    dispatch = app._dash_relay_dispatcher
+
+    # Special bridge → pinned wins
+    result = dispatch({"action": "close", "bridge": "bridge-special"}, {})
+    assert result == {"by": "pinned"}
+
+    # Default bridge → no pinned match → wildcard
+    result = dispatch({"action": "close", "bridge": "bridge-default"}, {})
+    assert result == {"by": "wildcard"}
+
+
+def test_wildcard_fallback_when_pinned_does_not_match_firing_bridge():
+    @relay.handle(Output("a", "data"), Action("close"), State("a", "data"))
+    def fallback(event, current):
+        return {"by": "wildcard"}
+
+    @relay.handle(Output("a", "data"), Action("close", bridge="other"), State("a", "data"))
+    def pinned(event, current):
+        return {"by": "pinned"}
+
+    app = Dash(__name__)
+    app.layout = html.Div([
+        dcc.Store(id="a"),
+        relay.bridge("primary"),
+        relay.bridge("other"),
+    ])
+    relay.install(app)
+    dispatch = app._dash_relay_dispatcher
+
+    # primary fires → no pinned for primary, wildcard wins
+    result = dispatch({"action": "close", "bridge": "primary"}, {})
+    assert result == {"by": "wildcard"}
+
+
+def test_event_with_no_bridge_field_uses_wildcard():
+    # Defensive: if the event somehow lacks a bridge (e.g. test driving
+    # the dispatcher with a bare event), fall through to wildcard.
+    @relay.handle(Output("a", "data"), Action("close"), State("a", "data"))
+    def _(event, current): return {"by": "wildcard"}
+
+    @relay.handle(Output("a", "data"), Action("close", bridge="x"), State("a", "data"))
+    def _(event, current): return {"by": "pinned"}
+
+    app = Dash(__name__)
+    app.layout = html.Div([dcc.Store(id="a"), relay.bridge("x")])
+    relay.install(app)
+    dispatch = app._dash_relay_dispatcher
+
+    # No bridge field → no pinned match → wildcard runs
+    result = dispatch({"action": "close"}, {})
+    assert result == {"by": "wildcard"}

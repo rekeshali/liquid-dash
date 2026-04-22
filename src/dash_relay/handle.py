@@ -181,14 +181,28 @@ def _build_dispatcher(handlers: list[HandlerSpec], *, force_allow_duplicate: boo
     output_index_by_key = {_output_key(o): i for i, o in enumerate(all_outputs)}
     n_outputs = len(all_outputs)
 
-    handler_by_action: dict[str, HandlerSpec] = {}
+    # Routing tables. Pinned handlers (Action(name, bridge="x")) keyed
+    # by (name, bridge_id). Wildcard handlers (Action(name)) keyed by
+    # name only. Pinned shadows wildcard for its specific bridge; the
+    # wildcard handles every other bridge that fires the same action.
+    pinned_by_key: dict[tuple, HandlerSpec] = {}
+    wildcard_by_action: dict[str, HandlerSpec] = {}
     for h in handlers:
-        if h.action.name in handler_by_action:
-            raise ValueError(
-                f"Multiple handlers registered for action {h.action.name!r}; "
-                "each action name must have at most one handler"
-            )
-        handler_by_action[h.action.name] = h
+        if h.action.bridge_id is None:
+            if h.action.name in wildcard_by_action:
+                raise ValueError(
+                    f"Multiple wildcard handlers registered for action "
+                    f"{h.action.name!r}; use bridge= on Action to disambiguate"
+                )
+            wildcard_by_action[h.action.name] = h
+        else:
+            key = (h.action.name, h.action.bridge_id)
+            if key in pinned_by_key:
+                raise ValueError(
+                    f"Multiple handlers for action {h.action.name!r} pinned "
+                    f"to bridge {h.action.bridge_id!r}"
+                )
+            pinned_by_key[key] = h
 
     def _no_update_response():
         return [no_update] * n_outputs if n_outputs > 1 else no_update
@@ -196,7 +210,13 @@ def _build_dispatcher(handlers: list[HandlerSpec], *, force_allow_duplicate: boo
     def _dispatch(event, *state_values):
         if not event or "action" not in event:
             return _no_update_response()
-        handler = handler_by_action.get(event["action"])
+        action_name = event["action"]
+        bridge_of_event = event.get("bridge")
+        # Pinned wins over wildcard for the firing bridge; otherwise fall back.
+        handler = (
+            pinned_by_key.get((action_name, bridge_of_event))
+            or wildcard_by_action.get(action_name)
+        )
         if handler is None:
             return _no_update_response()
 

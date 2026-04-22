@@ -183,6 +183,46 @@ def test_validate_flags_state_id_with_no_store_in_layout():
     assert "output-not-found" not in codes
 
 
+def test_validate_flags_pinned_handler_with_no_emitter_on_its_bridge():
+    # Handler is pinned to bridge "ghost" but no emitter in the layout
+    # writes to that bridge — handler will never fire.
+    @relay.handle(Output("state", "data"), Action("close", bridge="ghost"))
+    def _(event): return {}
+
+    app = Dash(__name__)
+    app.layout = html.Div([dcc.Store(id="state"), relay.bridge("real")])
+    relay.install(app)
+
+    layout = html.Div([
+        dcc.Store(id="state"),
+        relay.bridge("real"),
+        relay.emitter(html.Button("X"), "close", bridge="real"),  # → real bridge
+    ])
+    report = relay.validate(layout, app=app)
+    codes = {i.code for i in report.issues}
+    assert "unreachable-handler" in codes
+    msg = next(i.message for i in report.issues if i.code == "unreachable-handler")
+    assert "ghost" in msg
+
+
+def test_validate_clean_when_pinned_handler_has_matching_emitter():
+    @relay.handle(Output("state", "data"), Action("close", bridge="real"))
+    def _(event): return {}
+
+    app = Dash(__name__)
+    app.layout = html.Div([dcc.Store(id="state"), relay.bridge("real")])
+    relay.install(app)
+
+    layout = html.Div([
+        dcc.Store(id="state"),
+        relay.bridge("real"),
+        relay.emitter(html.Button("X"), "close", bridge="real"),
+    ])
+    report = relay.validate(layout, app=app)
+    codes = {i.code for i in report.issues}
+    assert "unreachable-handler" not in codes
+
+
 def test_validate_clean_when_output_and_state_stores_present():
     @relay.handle(
         Output("write", "data"),

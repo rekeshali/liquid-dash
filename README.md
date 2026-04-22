@@ -224,6 +224,36 @@ dispatcher per bridge automatically and forces `allow_duplicate=True`
 on every `Output` so they coexist correctly. Adding a second bridge
 to an existing app is a layout-only change.
 
+**Action-name collisions.** Action names live in a global namespace
+— one handler per name across the app. If two emitters on different
+bridges genuinely use the same action string and you want different
+handlers per bridge, pin them with `Action(name, bridge="...")`:
+
+```python
+@relay.handle(
+    Output("tab_store", "data"),
+    Action("close", bridge="folder.tabbar"),       # only fires from this bridge
+    State("tab_store", "data"),
+)
+def close_tab(event, tabs): ...
+
+@relay.handle(
+    Output("panel_store", "data"),
+    Action("close", bridge="panel-grid"),          # only fires from this bridge
+    State("panel_store", "data"),
+)
+def close_panel(event, panels): ...
+```
+
+Routing rule: the dispatcher prefers a pinned `(name, bridge)` match;
+if none matches the firing bridge, it falls back to the wildcard
+`Action(name)` if one is registered. So a wildcard handler can be the
+default with per-bridge overrides for surfaces that need different
+behavior. Two wildcards for the same name still raise (today's dedupe
+rule). Two pinned handlers for the same `(name, bridge)` pair also
+raise. A wildcard plus per-bridge pins for the same name is fine —
+each pin shadows the wildcard for its specific bridge only.
+
 **Escape hatch.** Skip `@relay.handle` and write a normal
 `@app.callback(Input("bridge", "data"), ...)` yourself. The bridge
 store is a regular `dcc.Store`; nothing prevents direct use.
@@ -254,6 +284,9 @@ the registered handlers against the layout:
 - **output-not-found** — a handler declares an `Output` whose store id
   isn't a `dcc.Store` in the layout
 - **state-not-found** — same for `State` ids
+- **unreachable-handler** — a handler is pinned via `Action(bridge=)`
+  to a bridge that no emitter in the layout writes to (handler will
+  never fire — typo or stale wiring)
 
 ```python
 relay.install(app)
