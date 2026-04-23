@@ -49,12 +49,16 @@ had three measurement bugs and one stale claim. All four are fixed.
 ### Documentation
 
 - Updated the README's headline performance bullets and the example
-  README's measurement table to honest figures: ~80% fewer
-  round-trips (unchanged — this is structural), ~34% less data sent
-  (was ~83%), ~38% faster wall time (was ~40%, basically unchanged).
-- New comparison-demo.gif recorded after all fixes; the visible
-  numbers in the GIF match what readers will see if they run the
-  demo themselves.
+  README's measurement table to honest figures from a single
+  9-click test run (the same numbers visible in the demo GIF):
+  ~80% fewer round-trips (unchanged — this is structural),
+  ~29% less data sent (was ~83%), ~36% faster wall time
+  (was ~40%, basically unchanged within run-to-run noise).
+- New comparison-demo.gif recorded after all fixes. README and GIF
+  now show the same numbers: anyone who runs the demo once and looks
+  at the compare panel will see exactly what the README claims. The
+  byte and time advantage typically grows by a few percent as state
+  accumulates over multiple test-run clicks.
 - Added language clarifying that round-trip count is structural and
   stable while byte and time figures depend on payload size and
   network latency.

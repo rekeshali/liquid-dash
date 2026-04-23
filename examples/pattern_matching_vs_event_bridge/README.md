@@ -28,32 +28,35 @@ Tests run: N    Round-trips: N    Total: N KB    Total time: N s
 
 A fixed **Head-to-head** panel in the top-right corner has a
 **▶ Run both tests** button that fires both columns in parallel and
-aggregates the per-run deltas into percent-difference cards
-(`~80% fewer round-trips`, `~34% less data`, `~38% faster`). The
-aggregate accumulates across every Run-both click so the raw
-before → after numbers grow with use.
+shows the per-run deltas as percent-difference cards
+(`~80% fewer round-trips`, `~29% less data`, `~36% faster` on a single
+run). The aggregate accumulates across every Run-both click, so the
+raw before → after numbers grow with use and the data/time advantage
+typically widens by a few percent as state accumulates.
 
-## Measured contrast (test runs = 9 clicks each)
+## Measured contrast (one test run = 9 clicks)
 
 Numbers below are from an Apple M1 Pro running the Dash dev server
-locally (so "network transit" is loopback). Absolute times will differ
+locally (so "network transit" is loopback) on a single test run —
+the same numbers visible in the demo GIF. Absolute times will differ
 on other hardware; the percent deltas are more transferable because
 both columns live in the same process. Bytes are request + response
 combined (a prior version of the demo only counted request bytes,
-which made the data-sent advantage look much larger than it really is).
+which made the data-sent advantage look much larger than it really
+was).
 
 | | callback graph | round-trips | bytes (req + resp) | wall time |
 |---|---|---|---|---|
-| Pattern-matching column | 10 callbacks | ~88 / run | ~261 KB / run | ~700 ms / run |
-| Event-bridge column | 2 callbacks + 9 handlers | ~18 / run | ~171 KB / run | ~430 ms / run |
-| Event-bridge delta | ~80% smaller graph | ~80% fewer | ~34% less | ~38% faster |
+| Pattern-matching column | 10 callbacks | ~88 | ~186 KB | ~643 ms |
+| Event-bridge column | 2 callbacks + 9 handlers | ~18 | ~133 KB | ~411 ms |
+| Event-bridge delta | ~80% smaller graph | ~80% fewer | ~29% less | ~36% faster |
 
 Round-trip count is structural and stable: 9 clicks fire 9 dispatch
 fetches + 9 render fetches on the relay side (18 total) regardless of
 state size; the pattern-matching column scales with matched-set size.
 Byte and time figures depend on payload size and network latency;
-under loopback and small state, the bridge wins by ~30–40%, but the
-gap widens with real network latency (per-fetch round-trip overhead
+under loopback and small state, the bridge wins by ~30%, but the gap
+widens with real network latency (per-fetch round-trip overhead
 dominates) and shrinks with simple non-pattern-matched cases (where
 both columns do roughly the same work).
 
@@ -127,11 +130,11 @@ invariants live in one place.
 
 ### Directly measured in this demo
 
-- **Faster round-trips** — ~38% less time from user click to final
+- **Faster round-trips** — ~36% less time from user click to final
   server response arriving at the browser (summed across the 9-click
   test sequence). This is specifically the server-round-trip window;
   client-side render time is not counted.
-- **Less network traffic** — ~34% fewer bytes over the wire (request
+- **Less network traffic** — ~29% fewer bytes over the wire (request
   + response combined), because
   every phantom round-trip on the pattern-matching side ships the
   full State store just to return `no_update`.
