@@ -295,5 +295,10 @@ def _bridge_store_id(bridge_name: str) -> str:
 
     Per the v4 spec (B1), ``.`` characters in bridge names are replaced
     with ``__`` so CSS selectors don't parse the dot as a class separator.
+
+    This rule MUST stay in sync with the JS runtime's store-id derivation
+    in ``src/dash_relay/assets/dash_relay.js`` (search for "storeId").
+    The regression guard is ``tests/test_app.py::
+    test_js_runtime_mirrors_bridge_store_id_rule``.
     """
     return f"relay-bridge-{bridge_name.replace('.', '__')}"

@@ -104,7 +104,12 @@
       timestamp: Date.now() / 1000,
     };
 
-    window.dash_clientside.set_props(bridge, { data: payload });
+    // Translate the bridge NAME into the dcc.Store ID. This rule MUST stay
+    // in sync with `_bridge_store_id` in `src/dash_relay/callback.py`.
+    // See `tests/test_app.py::test_js_runtime_mirrors_bridge_store_id_rule`
+    // for the regression guard.
+    var storeId = "relay-bridge-" + bridge.replace(/\./g, "__");
+    window.dash_clientside.set_props(storeId, { data: payload });
   }
 
   function ensureListener(type) {

@@ -122,6 +122,38 @@ def test_bridge_store_id_replaces_dot_with_double_underscore():
     assert _bridge_store_id("simple") == "relay-bridge-simple"
 
 
+def test_js_runtime_mirrors_bridge_store_id_rule():
+    """The JS runtime derives the dcc.Store id from the bridge name with
+    the same rule as Python's `_bridge_store_id`. If JS and Python drift,
+    every click is a silent no-op (the JS writes to a store id that doesn't
+    exist). This test asserts the rule appears in the JS asset as a string.
+
+    Brittle on purpose — if the JS rule moves or changes shape, this fails
+    loud and the regression message in `_bridge_store_id` points at the
+    fix location.
+    """
+    from importlib import resources
+
+    js_text = (
+        resources.files("dash_relay")
+        .joinpath("assets", "dash_relay.js")
+        .read_text(encoding="utf-8")
+    )
+    # Two facts the JS must encode:
+    #   1. The store-id prefix is "relay-bridge-".
+    #   2. Dots in the bridge name are replaced with double-underscore.
+    # Spelling tolerated: any standard JS replace expressions for "." → "__".
+    assert '"relay-bridge-"' in js_text, (
+        "JS runtime must prefix store ids with 'relay-bridge-'; "
+        "see _bridge_store_id in callback.py for the canonical rule."
+    )
+    assert 'replace(/\\./g, "__")' in js_text, (
+        "JS runtime must replace '.' with '__' to match Python's "
+        "_bridge_store_id slug rule. Without this, clicks silently no-op "
+        "because Dash has no store at the raw bridge name."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Layout injection — three shapes
 # ---------------------------------------------------------------------------
