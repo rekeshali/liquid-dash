@@ -4,6 +4,36 @@ All notable changes to this project are documented here. Format based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] — 2026-04-22
+
+Documentation cleanup pass. No library code changes; no PyPI release.
+Lives on main as the working version while the next ship is being
+prepared. When a future technical change ships, it inherits these
+documentation fixes without a separate version bump for them.
+
+### Cleanup
+
+- README event-dict-keys table: cells like `str | int | dict | None`
+  were breaking the markdown table because `|` is also the column
+  separator. Switched to `str` / `int` / `dict` / `None` (separated
+  backticks) to match the form already used in the CHANGELOG.
+- Replaced "v4" / "v4 spec" / "v4 cut" references with neutral
+  language in `__init__.py`, `app.py`, `callback.py` (×4 including
+  two user-facing `InstallError` messages), `validation.py`, the
+  client-side JS asset, the README, and three test docstrings. The
+  shipped library is 2.x; "v4" was a label from the design-iteration
+  branches that never published.
+- Migrated comment-only references to the legacy 1.x API in
+  `examples/workspace_demo/app.py` (×5: `@relay.handle`,
+  `relay.registry()`, "3.0 handler signature") and
+  `examples/pattern_matching_vs_event_bridge/nested_side_by_side.py`
+  (×3) to the current `@relay.callback` vocabulary. Code itself was
+  already migrated; only the comments lagged.
+- Same migration in the example READMEs:
+  `examples/workspace_demo/README.md` and
+  `examples/pattern_matching_vs_event_bridge/README.md` no longer
+  reference `relay.registry`, `relay.emitter`, or `@events.handler`.
+
 ## [2.0.0] — 2026-04-22
 
 First major version after 1.1.2. The dispatch surface is rebuilt

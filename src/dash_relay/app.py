@@ -1,4 +1,4 @@
-"""``relay.install(app)`` — the v4 lifecycle entry point."""
+"""``relay.install(app)`` — the lifecycle entry point."""
 from __future__ import annotations
 
 from importlib import resources

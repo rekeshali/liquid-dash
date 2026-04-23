@@ -1,6 +1,6 @@
 """Dash Relay — client-side event bridge for Dash.
 
-Public surface (v4):
+Public surface:
 
     import dash_relay as relay
     from dash_relay import Action, Emitter, DEFAULT_BRIDGE

@@ -78,10 +78,10 @@ whether those actions are first-class Dash callbacks.
   adds a new pattern callback.
 - **Event-bridge column:** one Dash callback for dispatch
   (1) + renderer (1) = **2 in the callback graph**. Per-action logic
-  lives as 9 handlers registered on the dispatch callback's action
-  registry (`@events.handler("action")`). Adding a new action is a
-  new handler — not a new Dash callback, not a new pattern-matching
-  subscriber, no new phantom-fire surface.
+  lives as 9 handlers registered against the bridge via
+  `@relay.callback(Output(...), Action("..."), State(...))`. Adding
+  a new action is a new handler — not a new Dash callback, not a new
+  pattern-matching subscriber, no new phantom-fire surface.
 
 The callback *graph* is what carries cost. Handlers are Python dict
 lookups at dispatch time — they don't phantom-fire, don't subscribe
@@ -164,9 +164,9 @@ invariants live in one place.
     - Re-checking phantom-fire behavior every time a new pattern
       callback is added.
 
-Event-bridge handlers are just `@events.handler("name") def _(s,
-payload, event): ...` with no defensive boilerplate. None of the
-above applies.
+Event-bridge handlers are just `@relay.callback(Output(...),
+Action("name"), State(...)) def _(event, s): ...` with no defensive
+boilerplate. None of the above applies.
 
 ## What Dash Relay trades away
 
@@ -175,18 +175,22 @@ Dash Relay adds a client-side script (~120 lines) and one wrapper
 rather than the standard Dash callback graph. Concretely, the
 tradeoffs are:
 
-- **Extra DOM nodes.** Every `relay.emitter(...)` wraps its component
-  in a `display: contents` div. Visually invisible, and layout is
-  unchanged, but the extra node is there. CSS selectors or
-  third-party JS that walk DOM siblings may need to account for it.
-- **Action names are magic strings.** `relay.emitter(btn, "panel.add")`
-  and `@events.handler("panel.add")` are linked by string identity,
-  with no "find references" path through the IDE. `relay.validate(
-  app.layout, registry=events)` catches mismatches (orphan emitters,
-  orphan handlers) at load time — but it has to be called. Pure-Dash's
-  Python-symbol linkage is enforced without any tooling step.
-- **Stack traces go through the registry.** A `ZeroDivisionError` in a
-  handler shows `Registry.dispatch → handler` frames before landing
+- **Optional extra DOM nodes.** `Emitter(...).wrap(component)` puts
+  the component inside a `display: contents` div. Visually invisible,
+  and layout is unchanged, but the extra node is there. CSS selectors
+  or third-party JS that walk DOM siblings may need to account for
+  it. Use `Emitter(...).attrs()` splatted onto the component when you
+  need no wrapper at all (preserves `>` direct-child selectors and
+  flex/grid child positioning).
+- **Action names are magic strings.** `Emitter(action="panel.add")`
+  and `Action("panel.add")` are linked by string identity, with no
+  "find references" path through the IDE. `relay.validate(app.layout,
+  app=app)` catches mismatches (`missing-handler`,
+  `unreachable-handler`, `duplicate-handler`) at load time — but it
+  has to be called. Pure-Dash's Python-symbol linkage is enforced
+  without any tooling step.
+- **Stack traces go through the dispatcher.** A `ZeroDivisionError` in a
+  handler shows the relay dispatcher frame before landing
   in your code. Pure-Dash tracebacks land directly on the failing
   callback. Small ergonomics tax when debugging.
 - **The Dash dev panel callback view is less useful.** The graph

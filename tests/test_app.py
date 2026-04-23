@@ -1,4 +1,4 @@
-"""install() lifecycle and runtime-injection tests for v4."""
+"""install() lifecycle and runtime-injection tests."""
 from __future__ import annotations
 
 import pytest

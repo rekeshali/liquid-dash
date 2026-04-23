@@ -64,7 +64,7 @@ def callback(*deps, **_kwargs) -> Callable[[Callable], Callable]:
             return {**tabs, "tabs": [t for t in tabs["tabs"] if t["id"] != event["target"]]}
 
     Pattern-matched component ids in ``Output`` / ``State`` are not
-    supported in v4 (the per-bridge consolidation in ``install()`` is
+    supported (the per-bridge consolidation in ``install()`` is
     incompatible with MATCH-binding). ``InstallError`` is raised at
     install time if any handler declares them.
     """
@@ -132,7 +132,7 @@ def _is_pattern_id(component_id: Any) -> bool:
     # Dash represents pattern wildcards as objects with a `wildcard` attribute,
     # but the canonical surface is `dash.MATCH` / `dash.ALL` / `dash.ALLSMALLER`,
     # which are sentinels of type Wildcard. Detection by repr is brittle, so
-    # we conservatively flag any dict-shaped id as a pattern (the v4 cut
+    # we conservatively flag any dict-shaped id as a pattern (relay
     # rejects dict ids on relay callbacks regardless of wildcard presence).
     return True
 
@@ -143,7 +143,7 @@ def _validate_no_pattern_ids(spec: CallbackSpec) -> None:
             raise InstallError(
                 f"@callback declared in {spec.source_file}:{spec.source_line} "
                 f"uses a pattern-matched dict id in Output ({o.component_id!r}). "
-                "Pattern-matched ids are not supported in dash-relay v4 — "
+                "Pattern-matched ids are not supported in dash-relay — "
                 "use a fixed store id or write a separate non-relay callback."
             )
     for s in spec.states:
@@ -151,7 +151,7 @@ def _validate_no_pattern_ids(spec: CallbackSpec) -> None:
             raise InstallError(
                 f"@callback declared in {spec.source_file}:{spec.source_line} "
                 f"uses a pattern-matched dict id in State ({s.component_id!r}). "
-                "Pattern-matched ids are not supported in dash-relay v4 — "
+                "Pattern-matched ids are not supported in dash-relay — "
                 "use a fixed store id or write a separate non-relay callback."
             )
 
@@ -293,7 +293,7 @@ def _build_bridge_dispatcher(plan: BridgePlan):
 def _bridge_store_id(bridge_name: str) -> str:
     """Convert a bridge name to its dcc.Store id.
 
-    Per the v4 spec (B1), ``.`` characters in bridge names are replaced
+    Per spec B1, ``.`` characters in bridge names are replaced
     with ``__`` so CSS selectors don't parse the dot as a class separator.
 
     This rule MUST stay in sync with the JS runtime's store-id derivation

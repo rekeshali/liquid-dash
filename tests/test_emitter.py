@@ -1,4 +1,4 @@
-"""Emitter (template class) tests for v4."""
+"""Emitter (template class) tests."""
 from __future__ import annotations
 
 import json

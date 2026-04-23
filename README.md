@@ -274,20 +274,20 @@ clientside) can also write to them with `allow_duplicate=True`. The
 relay dispatcher's outputs are always declared with `allow_duplicate=True`
 internally so coexistence works without extra effort.
 
-**Pattern-matched ids are not supported in v4.** If a handler declares
+**Pattern-matched ids are not supported.** If a handler declares
 an `Output` or `State` with a dict-shaped (`MATCH`/`ALL`/`ALLSMALLER`)
 id, `install()` raises `InstallError`. Use a fixed store id, or write
 a separate non-relay `@app.callback` for the pattern-matched case.
 
-**Event dict keys** (frozen for v4):
+**Event dict keys** (frozen for v2):
 
 | key | type | what it is |
 |---|---|---|
 | `action` | `str` | the Action name |
 | `bridge` | `str` | the bridge that fired |
-| `target` | `str | int | dict | None` | user-defined target value, parsed back from the wire |
-| `source` | `str | None` | source component id (auto-filled from wrap, optional) |
-| `payload` | `dict | None` | user-supplied payload |
+| `target` | `str` / `int` / `dict` / `None` | user-defined target value, parsed back from the wire |
+| `source` | `str` / `None` | source component id (auto-filled from wrap, optional) |
+| `payload` | `dict` / `None` | user-supplied payload |
 | `type` | `str` | DOM event name (click, keydown, blur, ...) — same as JS `event.type` |
 | `details` | `dict` | extracted browser fields off the DOM event (value, checked, key, clientX/Y, deltaX/Y, button) — same shape as `CustomEvent.detail` |
 | `timestamp` | `float` | seconds since epoch (client clock) |

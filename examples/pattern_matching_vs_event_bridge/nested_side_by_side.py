@@ -1001,10 +1001,10 @@ def pd_panel_duplicate(_clicks, s):
 # ---------------------------------------------------------------------------
 # Dash Relay column
 #
-# One bridge. One dispatch callback (registered by relay.registry). One renderer.
-# Nine handlers registered against the bridge, each just calls the shared
-# do_* helper. The callback graph is the same whether we have 9 actions or
-# 90.
+# One bridge. One dispatch callback (registered by relay.install). One renderer.
+# Nine handlers registered via @relay.callback against the bridge, each just
+# calls the shared do_* helper. The callback graph is the same whether we
+# have 9 actions or 90.
 # ---------------------------------------------------------------------------
 # >>> RELAY-ACTIONS-BEGIN
 
@@ -1151,10 +1151,11 @@ def _count_source_lines(begin_marker, end_marker):
 
 _PD_CB_COUNT = _count_callbacks("pd-")
 _RELAY_CB_COUNT = _count_callbacks("relay-")
-# Dash Relay also has per-action handlers registered via @relay.handle(...).
-# They're not in the Dash callback graph (one Dash dispatch callback routes
-# to all of them by action name), so they don't inflate phantom-fire cost
-# the way pattern-matching callbacks do. But they're still code we wrote.
+# Dash Relay also has per-action handlers registered via @relay.callback(...).
+# They're not in the Dash callback graph (one Dash dispatch callback per
+# bridge routes to all of them by action name), so they don't inflate
+# phantom-fire cost the way pattern-matching callbacks do. But they're
+# still code we wrote.
 # Counted from the pending pool BEFORE relay.install(app) drains it.
 from dash_relay.callback import _PENDING_CALLBACKS as _relay_pending
 _RELAY_HANDLER_COUNT = sum(
@@ -1255,8 +1256,9 @@ app.layout = html.Div([
 })
 
 
-# install() drains the @relay.handle pool registered above, registers
-# the JS runtime + Flask route, and wires the dispatcher Dash callback.
+# install() drains the @relay.callback pool registered above, mints the
+# bridge stores, registers the JS runtime + Flask route, and wires one
+# dispatcher Dash callback per bridge.
 relay.install(app)
 
 

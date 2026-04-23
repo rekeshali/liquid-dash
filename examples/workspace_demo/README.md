@@ -24,9 +24,10 @@ the pattern survives contact with a non-trivial surface:
   action surface
 - **Shared editor form** — one form hydrates from whichever entity
   was most recently "opened"
-- **Multi-state registry** — one bridge writes to two stores
-  (`canvas` and `editor`) via `relay.registry(app, state=["canvas",
-  "editor"])`
+- **Multiple stores from one bridge** — handlers declare their own
+  Outputs/States; the library unions per bridge so one Dash callback
+  writes both `canvas-store` and `editor-store` from the
+  `ui-events` bridge
 - **Pure-function dispatcher** — the same `_ACTIONS` table used at
   runtime is called directly from unit tests via
   `reduce_ui_event(canvas, editor, event)`

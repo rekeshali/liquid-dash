@@ -28,7 +28,7 @@
     }
   }
 
-  // v4 target encoding (B10): plain string for str/int targets, JSON for
+  // Target encoding: plain string for str/int targets, JSON for
   // dict targets. Empty -> null. Detect dict by leading "{" or "[", int
   // by all-digit (with optional leading sign), else string.
   var INT_PATTERN = /^-?\d+$/;

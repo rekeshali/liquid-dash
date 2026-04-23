@@ -1,6 +1,6 @@
 """``relay.validate()`` — correctness-only checks for relay-using layouts.
 
-v4 scope (per spec):
+Scope:
   * Pre-install duplicate-handler detection.
   * Unreachable-handler detection (handler on a bridge no emitter
     targets).

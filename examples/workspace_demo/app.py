@@ -292,7 +292,7 @@ def active_ids_text(state: dict[str, Any]) -> str:
 # one of the state variables (e.g. wholesale replacing editor).
 #
 # Every handler is registered in `_ACTIONS` at import time so it can be
-# dispatched both by the relay.registry() callback in `build_app()` and by the
+# dispatched both by the @relay.callback wrappers in `build_app()` and by the
 # pure-function `reduce_ui_event()` wrapper used in tests.
 
 _ACTIONS: dict[str, Callable] = {}
@@ -511,7 +511,7 @@ def _(states, payload, event):
 #
 # Tests call `demo.reduce_ui_event(canvas, editor, event)` directly without
 # constructing a Dash app. This wrapper preserves that interface by going
-# through the same `_ACTIONS` table the relay.registry() dispatcher uses.
+# through the same `_ACTIONS` table the @relay.callback dispatchers use.
 
 
 def reduce_ui_event(
@@ -949,11 +949,11 @@ def build_render_summary(state: dict[str, Any] | None) -> tuple[str, str]:
 # --- App construction ------------------------------------------------------
 
 def _register_handlers() -> None:
-    """Wire each pure action function in _ACTIONS into @relay.handle.
+    """Wire each pure action function in _ACTIONS into @relay.callback.
 
     Pure functions keep their (states_tuple, payload, event) signature so
     the test-side reduce_ui_event helper can drive them directly. The
-    @relay.handle wrappers below adapt to the 3.0 handler signature
+    @relay.callback wrappers below adapt to the relay handler signature
     (event, canvas, editor) and the (canvas, editor) tuple return shape.
     """
     for action_name, pure_fn in _ACTIONS.items():
@@ -1219,7 +1219,7 @@ def build_app() -> Dash:
     )
 
     # Callback 1: UI events → (canvas, editor).
-    # Each pure action in _ACTIONS becomes a @relay.handle entry; the
+    # Each pure action in _ACTIONS becomes a @relay.callback entry; the
     # install() call at the end of build_app() consumes the pool and
     # registers one dispatcher Dash callback for UI_EVENT_BRIDGE.
     _register_handlers()
@@ -1367,7 +1367,7 @@ def build_app() -> Dash:
         return close_editor_state()
 
     # Drains the handler pool and registers one dispatcher per bridge.
-    # Must run AFTER all @relay.handle decorators have populated the pool.
+    # Must run AFTER all @relay.callback decorators have populated the pool.
     relay.install(app)
 
     return app

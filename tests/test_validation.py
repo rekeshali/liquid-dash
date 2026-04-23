@@ -1,4 +1,4 @@
-"""Tests for relay.validate() against the v4 surface."""
+"""Tests for relay.validate()."""
 from __future__ import annotations
 
 import pytest
